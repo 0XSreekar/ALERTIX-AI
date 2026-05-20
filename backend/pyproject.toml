@@ -2,7 +2,7 @@
 name = "alertix-backend"
 version = "0.1.0"
 description = "Alertix AI backend — real-time multi-hazard monitoring for India"
-readme = "../README.md"
+readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "Proprietary" }
 authors = [{ name = "Alertix AI" }]
