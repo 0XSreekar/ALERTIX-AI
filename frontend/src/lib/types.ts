@@ -79,6 +79,19 @@ export interface WildfireCluster {
   risk: string;
 }
 
+export interface WildfirePrediction {
+  clusters: WildfireCluster[];
+  total_hotspots: number;
+}
+
+export interface LandslidePrediction {
+  gsi_zone: string | null;
+  rainfall_threshold_exceeded: boolean;
+  cumulative_rainfall_mm: number | null;
+  threshold_mm: number | null;
+  risk_level: string;
+}
+
 export type HazardType =
   | "earthquake"
   | "flood"

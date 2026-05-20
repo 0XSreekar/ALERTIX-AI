@@ -1,10 +1,9 @@
-"""Damage assessment endpoint — POST /api/damage/segment.
-
-Phase 1: accepts upload, returns placeholder. Phase 2: runs DeepLabV3."""
+"""Damage assessment endpoint — POST /api/damage/segment (DeepLabV3)."""
 
 from fastapi import APIRouter, Depends, File, UploadFile
 
 from app.auth.deps import CurrentUser, current_user
+from app.ml.damage_segment import segment_image
 
 router = APIRouter(prefix="/api/damage", tags=["damage"])
 
@@ -17,14 +16,12 @@ async def segment_damage(
     content = await file.read()
     size_kb = len(content) / 1024
 
-    # Phase 2: run DeepLabV3 segmentation on the image bytes
-    # For now, return a placeholder acknowledging the upload.
+    result = segment_image(content)
+
+    has_classes = bool(result.get("classes"))
     return {
-        "status": "preview",
+        "status": "analyzed" if has_classes else "unavailable",
         "filename": file.filename,
         "size_kb": round(size_kb, 1),
-        "message": "Damage segmentation model will be available in Phase 2. "
-        "Image received and stored for future processing.",
-        "classes": {},
-        "model_version": None,
+        **result,
     }

@@ -1,4 +1,12 @@
-import type { Alert, HazardEvent, SosReport, EarthquakePrediction, FloodPrediction } from "./types";
+import type {
+  Alert,
+  EarthquakePrediction,
+  FloodPrediction,
+  HazardEvent,
+  LandslidePrediction,
+  SosReport,
+  WildfirePrediction,
+} from "./types";
 import { getToken } from "./localAuth";
 
 const BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
@@ -76,6 +84,14 @@ export function fetchEarthquakePrediction(lat: number, lon: number, radiusKm = 2
 
 export function fetchFloodPrediction(basinId: string) {
   return apiFetch<FloodPrediction>(`/api/predict/flood?basin_id=${basinId}`);
+}
+
+export function fetchWildfirePrediction(bbox = "65,5,100,40") {
+  return apiFetch<WildfirePrediction>(`/api/predict/wildfire?bbox=${bbox}`);
+}
+
+export function fetchLandslidePrediction(lat: number, lon: number) {
+  return apiFetch<LandslidePrediction>(`/api/predict/landslide?lat=${lat}&lon=${lon}`);
 }
 
 // ── Contact ─────────────────────────────────────────────────

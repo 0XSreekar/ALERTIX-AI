@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import uuid
 from datetime import UTC, datetime, timedelta
+from typing import Annotated
 
 import bcrypt
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException
 from jose import jwt
 from pydantic import BaseModel
 from sqlalchemy import text
@@ -116,6 +117,34 @@ async def login(body: LoginRequest, session: AsyncSession = Depends(get_session)
     )
 
 
-@router.get("/me")
-async def me(session: AsyncSession = Depends(get_session)) -> dict:
-    return {"message": "use Authorization: Bearer <token> — JWT decode via auth deps"}
+class MeResponse(BaseModel):
+    user_id: str
+    email: str | None
+    role: str
+    full_name: str
+
+
+@router.get("/me", response_model=MeResponse)
+async def me(
+    session: AsyncSession = Depends(get_session),
+    authorization: Annotated[str | None, Header()] = None,
+) -> MeResponse:
+    from app.auth.deps import _decode_jwt, _extract_bearer, _from_payload
+
+    token = _extract_bearer(authorization)
+    if not token:
+        raise HTTPException(status_code=401, detail="Missing bearer token")
+    payload = _decode_jwt(token)
+    user = _from_payload(payload)
+
+    result = await session.execute(
+        text("SELECT full_name FROM profiles WHERE user_id = :uid"),
+        {"uid": user.user_id},
+    )
+    row = result.fetchone()
+    return MeResponse(
+        user_id=user.user_id,
+        email=user.email,
+        role=user.role,
+        full_name=row.full_name if row else "",
+    )
