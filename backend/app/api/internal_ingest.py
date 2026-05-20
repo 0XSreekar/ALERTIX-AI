@@ -7,11 +7,11 @@ from fastapi import APIRouter, Depends
 
 from app.auth.deps import verify_cron_token
 from app.db import AsyncSession, get_session
-from app.ingestion.usgs import ingest_usgs
-from app.ingestion.nasa_firms import ingest_firms
-from app.ingestion.imd_cyclone import ingest_imd
 from app.ingestion.cwc import ingest_cwc
 from app.ingestion.google_flood_hub import ingest_google_flood_hub
+from app.ingestion.imd_cyclone import ingest_imd
+from app.ingestion.nasa_firms import ingest_firms
+from app.ingestion.usgs import ingest_usgs
 
 router = APIRouter(prefix="/internal/ingest", tags=["internal"])
 

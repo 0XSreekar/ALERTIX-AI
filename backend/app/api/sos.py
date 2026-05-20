@@ -1,8 +1,6 @@
 """SOS citizen report API — POST /api/sos, GET /api/sos/mine, GET /api/sos/feed."""
 
-import asyncio
 import json
-from datetime import datetime, timezone
 from uuid import UUID
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request
@@ -12,9 +10,9 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.deps import CurrentUser, current_user, current_user_optional, require_role
-from app.db import get_session, async_session_factory
+from app.db import async_session_factory, get_session
 from app.logging import get_logger
-from app.schemas.sos import SosCreate, SosOut
+from app.schemas.sos import SosCreate
 
 log = get_logger(__name__)
 router = APIRouter(prefix="/api/sos", tags=["sos"])
@@ -95,7 +93,7 @@ async def submit_sos(
     await session.execute(
         text("""
             INSERT INTO audit_log (actor_user_id, action, target_table, target_id, payload)
-            VALUES (:uid, 'sos_submitted', 'sos_reports', :target_id, :payload::jsonb)
+            VALUES (:uid, 'sos_submitted', 'sos_reports', :target_id, CAST(:payload AS jsonb))
         """),
         {
             "uid": user_id,

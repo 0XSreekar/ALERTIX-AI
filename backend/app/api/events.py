@@ -1,6 +1,6 @@
 """Public events API — GET /api/events, /api/events/{id}, /api/events/recent."""
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -100,7 +100,7 @@ async def recent_events(
     hours: int = Query(24, ge=1, le=168),
     session: AsyncSession = Depends(get_session),
 ) -> dict:
-    cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
+    cutoff = datetime.now(UTC) - timedelta(hours=hours)
     params: dict = {"cutoff": cutoff}
     type_filter = ""
     if hazard_type:

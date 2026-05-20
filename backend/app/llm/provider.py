@@ -1,9 +1,11 @@
 ﻿"""LLM provider -- Ollama -> Groq -> Gemini fallback ladder."""
 from __future__ import annotations
+
 import logging
-from app.llm.ollama_client import OllamaClient
-from app.llm.groq_client import GroqClient
+
 from app.llm.gemini_client import GeminiClient
+from app.llm.groq_client import GroqClient
+from app.llm.ollama_client import OllamaClient
 
 log = logging.getLogger(__name__)
 _ollama = OllamaClient()

@@ -61,7 +61,8 @@ docker compose up --build   # Postgres + Redis + backend + frontend
 - **Frontend:** TypeScript 5, React 18 + Vite, Tailwind CSS + shadcn/ui, Leaflet + React-Leaflet, Recharts, Framer Motion, Three.js (landing only), TanStack Query + Zustand
 - **Database:** Supabase Postgres 15 + PostGIS (all geo columns use SRID 4326)
 - **Cache/queue:** Upstash Redis (Streams for ingestion, pub/sub for WebSocket fan-out)
-- **Auth:** Supabase Auth (JWT, HS256). Three roles: citizen, official, admin.
+- **Auth:** Local FastAPI auth in `app/api/auth.py` (bcrypt + HS256 JWT issued via `/api/auth/signup` and `/api/auth/login`). Three roles: citizen, official, admin. Frontend stores the token via `src/lib/localAuth.ts` in `localStorage`; `src/lib/api.ts` forwards it as `Authorization: Bearer <token>`. The HS256 secret is read from `SUPABASE_JWT_SECRET` (name kept for legacy; falls back to a dev default if unset).
+- **LLM model on Groq:** `llama-3.3-70b-versatile` (Llama 3.1 was decommissioned).
 - **Object storage:** Cloudflare R2
 - **LLM (Phase 2 only):** Ollama Qwen2.5-7B → Groq Llama 3.1 70B → Gemini 1.5 Flash fallback ladder
 - **Hosting:** Backend on Render free, frontend on Cloudflare Pages, cron via GitHub Actions

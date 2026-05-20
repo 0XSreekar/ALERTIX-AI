@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
-import Map from "@/components/Map";
+import HazardMap from "@/components/Map";
 import RiskGauge from "@/components/RiskGauge";
-import { fetchRecentEvents, fetchFloodPrediction } from "@/lib/api";
+import { fetchRecentEvents } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 const BASINS = ["krishna", "godavari", "mahanadi", "yamuna", "brahmaputra"];
@@ -17,7 +17,7 @@ export default function FloodTab() {
     <div className="space-y-6">
       <h2 className="text-2xl font-bold">Flood Monitor</h2>
 
-      <Map
+      <HazardMap
         events={eventsData?.events || []}
         className="h-[400px] w-full rounded-lg lg:h-[500px]"
       />

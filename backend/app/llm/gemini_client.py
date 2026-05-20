@@ -1,6 +1,8 @@
 ﻿"""Google Gemini client (second fallback)."""
 from __future__ import annotations
+
 import httpx
+
 from app.config import get_settings
 
 GEMINI_URL = (

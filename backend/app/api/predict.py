@@ -1,6 +1,6 @@
 """Prediction endpoints — Phase 2 wires in ML models and LLM explanations."""
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy import text
@@ -26,7 +26,7 @@ async def predict_earthquake(
     radius_km: float = Query(200, ge=10, le=2000),
     session: AsyncSession = Depends(get_session),
 ) -> EarthquakePrediction:
-    cutoff = datetime.now(timezone.utc) - timedelta(days=30)
+    cutoff = datetime.now(UTC) - timedelta(days=30)
     result = await session.execute(
         text("""
             SELECT count(*) as cnt,
@@ -63,7 +63,7 @@ async def predict_earthquake(
             "lat": lat,
             "lon": lon,
             "radius_m": radius_km * 1000,
-            "recent": datetime.now(timezone.utc) - timedelta(days=7),
+            "recent": datetime.now(UTC) - timedelta(days=7),
         },
     )
     ms = mainshock.fetchone()
@@ -71,7 +71,7 @@ async def predict_earthquake(
     aftershock_24h = None
     aftershock_7d = None
     if ms:
-        hours_since = (datetime.now(timezone.utc) - ms.occurred_at).total_seconds() / 3600
+        hours_since = (datetime.now(UTC) - ms.occurred_at).total_seconds() / 3600
         aftershock_24h = omori_aftershock_probability(ms.magnitude, hours_since)
         aftershock_7d = omori_aftershock_probability(ms.magnitude, max(0, hours_since - 144))
 
@@ -146,7 +146,7 @@ async def predict_wildfire(
         return WildfirePrediction()
 
     minlon, minlat, maxlon, maxlat = [float(p) for p in parts]
-    cutoff = datetime.now(timezone.utc) - timedelta(hours=24)
+    cutoff = datetime.now(UTC) - timedelta(hours=24)
 
     result = await session.execute(
         text("""

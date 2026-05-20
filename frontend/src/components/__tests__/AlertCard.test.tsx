@@ -46,7 +46,7 @@ describe("AlertCard", () => {
   it("calls onClick when clicked", () => {
     const onClick = vi.fn();
     render(<AlertCard alert={mockAlert} onClick={onClick} />);
-    screen.getByText("M5.2 Earthquake near Delhi").closest("[class]")?.click();
+    (screen.getByText("M5.2 Earthquake near Delhi").closest("[class]") as HTMLElement | null)?.click();
     expect(onClick).toHaveBeenCalled();
   });
 });

@@ -7,19 +7,17 @@ If weights are not available it returns a sentinel score of -1.0.
 from __future__ import annotations
 
 import logging
-import os
 from pathlib import Path
-from typing import Optional
 
 import numpy as np
 
 log = logging.getLogger(__name__)
 
-_MODEL_CACHE: Optional[object] = None
+_MODEL_CACHE: object | None = None
 _WEIGHTS_PATH = Path("/tmp/seismic_ae.pt")  # downloaded from R2 on first call
 
 
-def _try_load_model() -> Optional[object]:
+def _try_load_model() -> object | None:
     """Load torch model if weights exist, else return None."""
     global _MODEL_CACHE
     if _MODEL_CACHE is not None:
@@ -29,6 +27,7 @@ def _try_load_model() -> Optional[object]:
         return None
     try:
         import torch
+
         from app.ml.seismic_model import SeismicAutoencoder
         model = SeismicAutoencoder()
         model.load_state_dict(torch.load(_WEIGHTS_PATH, map_location="cpu"))

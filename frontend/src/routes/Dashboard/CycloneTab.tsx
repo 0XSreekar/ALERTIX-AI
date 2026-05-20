@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import Map from "@/components/Map";
+import HazardMap from "@/components/Map";
 import { fetchRecentEvents } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
@@ -14,7 +14,7 @@ export default function CycloneTab() {
     <div className="space-y-6">
       <h2 className="text-2xl font-bold">Cyclone Tracker</h2>
 
-      <Map
+      <HazardMap
         events={data?.events || []}
         className="h-[400px] w-full rounded-lg lg:h-[500px]"
       />
@@ -40,9 +40,9 @@ export default function CycloneTab() {
                     <p className="mt-1 text-xs text-muted-foreground">
                       {new Date(e.occurred_at).toLocaleString()}
                     </p>
-                    {meta?.summary && (
+                    {typeof meta?.summary === "string" && (
                       <p className="mt-2 text-sm text-muted-foreground">
-                        {(meta.summary as string).slice(0, 300)}
+                        {meta.summary.slice(0, 300)}
                       </p>
                     )}
                   </div>

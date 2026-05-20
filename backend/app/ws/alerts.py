@@ -4,7 +4,6 @@ Subscribes to Redis pub/sub channels and fans out to connected clients.
 """
 
 import asyncio
-import json
 
 from fastapi import APIRouter, Query, WebSocket, WebSocketDisconnect
 

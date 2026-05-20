@@ -3,7 +3,7 @@ Uses bcrypt + HS256 JWT. No Supabase required for local dev."""
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import bcrypt
 from fastapi import APIRouter, Depends, HTTPException
@@ -36,8 +36,8 @@ def _make_token(user_id: str, email: str, role: str) -> str:
         "sub": user_id,
         "email": email,
         "role": role,
-        "exp": datetime.now(timezone.utc) + timedelta(hours=JWT_EXPIRE_HOURS),
-        "iat": datetime.now(timezone.utc),
+        "exp": datetime.now(UTC) + timedelta(hours=JWT_EXPIRE_HOURS),
+        "iat": datetime.now(UTC),
     }
     return jwt.encode(payload, secret, algorithm=JWT_ALGORITHM)
 

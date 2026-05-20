@@ -80,9 +80,8 @@ function LavaStream({ angle, length }: { angle: number; length: number }) {
 
 function EruptionParticles() {
   const count = 180;
-  const { positions, velocities, offsets } = useMemo(() => {
+  const { positions, offsets } = useMemo(() => {
     const pos = new Float32Array(count * 3);
-    const vel = new Float32Array(count * 3);
     const off = new Float32Array(count);
     for (let i = 0; i < count; i++) {
       const theta = Math.random() * Math.PI * 2;
@@ -90,12 +89,9 @@ function EruptionParticles() {
       pos[i * 3] = Math.cos(theta) * r;
       pos[i * 3 + 1] = 0.42;
       pos[i * 3 + 2] = Math.sin(theta) * r;
-      vel[i * 3] = (Math.random() - 0.5) * 0.015;
-      vel[i * 3 + 1] = 0.02 + Math.random() * 0.04;
-      vel[i * 3 + 2] = (Math.random() - 0.5) * 0.015;
       off[i] = Math.random() * Math.PI * 2;
     }
-    return { positions: pos, velocities: vel, offsets: off };
+    return { positions: pos, offsets: off };
   }, []);
 
   const geoRef = useRef<THREE.BufferGeometry>(null);

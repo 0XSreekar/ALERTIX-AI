@@ -1,7 +1,7 @@
 """NASA FIRMS — VIIRS/MODIS active fire detection ingestion."""
 
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import httpx
 from sqlalchemy import text
@@ -9,7 +9,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
 from app.logging import get_logger
-from app.redis_client import get_redis
 
 log = get_logger(__name__)
 
@@ -32,7 +31,7 @@ async def fetch_firms_data(map_key: str) -> list[dict]:
         vals = line.split(",")
         if len(vals) != len(headers):
             continue
-        rows.append(dict(zip(headers, vals)))
+        rows.append(dict(zip(headers, vals, strict=False)))
     return rows
 
 
@@ -48,7 +47,7 @@ def _parse_hotspot(row: dict) -> dict | None:
     try:
         occurred_at = datetime.strptime(
             f"{acq_date} {acq_time.zfill(4)}", "%Y-%m-%d %H%M"
-        ).replace(tzinfo=timezone.utc)
+        ).replace(tzinfo=UTC)
     except ValueError:
         return None
 
@@ -99,7 +98,7 @@ async def ingest_firms(session: AsyncSession) -> dict:
                     ) VALUES (
                         :hazard_type, :source, :external_id, :occurred_at,
                         ST_SetSRID(ST_MakePoint(:longitude, :latitude), 4326)::geography,
-                        :intensity, :metadata::jsonb
+                        :intensity, CAST(:metadata AS jsonb)
                     )
                     ON CONFLICT (source, external_id) DO NOTHING
                     RETURNING id

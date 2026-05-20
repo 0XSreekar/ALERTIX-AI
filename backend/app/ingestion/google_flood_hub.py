@@ -1,7 +1,7 @@
 """Google Flood Hub API — riverine forecast ingestion for India."""
 
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import httpx
 from sqlalchemy import text
@@ -33,7 +33,7 @@ async def ingest_google_flood_hub(session: AsyncSession) -> dict:
         return {"status": "skipped", "reason": "no Google Flood Hub key configured"}
 
     gauges = await fetch_google_flood_hub(settings.google_flood_hub_key)
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     inserted = 0
     skipped = 0
 
@@ -58,7 +58,7 @@ async def ingest_google_flood_hub(session: AsyncSession) -> dict:
                     ) VALUES (
                         'flood', 'google_flood_hub', :external_id, :occurred_at,
                         ST_SetSRID(ST_MakePoint(:lon, :lat), 4326)::geography,
-                        :intensity, :metadata::jsonb
+                        :intensity, CAST(:metadata AS jsonb)
                     )
                     ON CONFLICT (source, external_id) DO NOTHING
                 """),

@@ -1,4 +1,4 @@
-import { MapContainer, TileLayer, Marker, Popup, CircleMarker, useMap } from "react-leaflet";
+import { MapContainer, TileLayer, Popup, CircleMarker } from "react-leaflet";
 import type { HazardEvent } from "@/lib/types";
 import { HAZARD_COLORS, type HazardType } from "@/lib/types";
 import "leaflet/dist/leaflet.css";

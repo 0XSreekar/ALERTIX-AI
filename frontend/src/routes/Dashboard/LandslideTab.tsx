@@ -1,5 +1,5 @@
 import RiskGauge from "@/components/RiskGauge";
-import Map from "@/components/Map";
+import HazardMap from "@/components/Map";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 export default function LandslideTab() {
@@ -11,7 +11,7 @@ export default function LandslideTab() {
         Phase 2 will add XGBoost susceptibility model.
       </p>
 
-      <Map events={[]} className="h-[400px] w-full rounded-lg lg:h-[500px]" />
+      <HazardMap events={[]} className="h-[400px] w-full rounded-lg lg:h-[500px]" />
 
       <div className="grid gap-4 sm:grid-cols-2">
         <Card>

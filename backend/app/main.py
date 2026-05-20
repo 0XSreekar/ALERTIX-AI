@@ -1,10 +1,9 @@
-from contextlib import asynccontextmanager
 from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 
 import sentry_sdk
-from fastapi import FastAPI, Request
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
@@ -59,13 +58,13 @@ app.add_middleware(
 )
 
 # ── Public API routers ─────────────────────────────────────────
-from app.api.auth import router as auth_router  # noqa: E402
-from app.api.events import router as events_router  # noqa: E402
 from app.api.alerts import router as alerts_router  # noqa: E402
-from app.api.sos import router as sos_router  # noqa: E402
-from app.api.predict import router as predict_router  # noqa: E402
-from app.api.damage import router as damage_router  # noqa: E402
+from app.api.auth import router as auth_router  # noqa: E402
 from app.api.contact import router as contact_router  # noqa: E402
+from app.api.damage import router as damage_router  # noqa: E402
+from app.api.events import router as events_router  # noqa: E402
+from app.api.predict import router as predict_router  # noqa: E402
+from app.api.sos import router as sos_router  # noqa: E402
 
 app.include_router(auth_router)
 app.include_router(events_router)

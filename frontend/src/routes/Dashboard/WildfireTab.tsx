@@ -1,10 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
-import Map from "@/components/Map";
+import HazardMap from "@/components/Map";
 import { fetchRecentEvents } from "@/lib/api";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 
 export default function WildfireTab() {
-  const { data, isLoading } = useQuery({
+  const { data } = useQuery({
     queryKey: ["events", "wildfire", "recent"],
     queryFn: () => fetchRecentEvents("wildfire", 24),
     refetchInterval: 300_000,
@@ -18,7 +18,7 @@ export default function WildfireTab() {
         Phase 2 will add DBSCAN clustering and risk classification.
       </p>
 
-      <Map
+      <HazardMap
         events={data?.events || []}
         className="h-[400px] w-full rounded-lg lg:h-[500px]"
       />

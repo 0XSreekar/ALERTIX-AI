@@ -1,6 +1,6 @@
 """Public alerts API — GET /api/alerts, /api/alerts/{id}, /api/alerts/region."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -49,7 +49,7 @@ async def list_alerts(
         params["severity"] = severity
     if active_only:
         conditions.append("(expires_at IS NULL OR expires_at > :now)")
-        params["now"] = datetime.now(timezone.utc)
+        params["now"] = datetime.now(UTC)
 
     where = "WHERE " + " AND ".join(conditions) if conditions else ""
 
@@ -94,7 +94,7 @@ async def alerts_by_region(
             "lat": lat,
             "lon": lon,
             "radius_m": radius_km * 1000,
-            "now": datetime.now(timezone.utc),
+            "now": datetime.now(UTC),
         },
     )
     rows = result.fetchall()

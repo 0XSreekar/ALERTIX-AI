@@ -2,11 +2,10 @@
 
 import json
 import re
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import feedparser
 import httpx
-from bs4 import BeautifulSoup
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -53,7 +52,8 @@ def _extract_coords(text_block: str) -> tuple[float | None, float | None]:
 
 async def ingest_imd(session: AsyncSession) -> dict:
     entries = await _fetch_rss_entries()
-    bulletin_html = await _fetch_cyclone_bulletin()
+    # Bulletin HTML is fetched to warm the cache; parsing is Phase 2.
+    await _fetch_cyclone_bulletin()
     inserted = 0
     skipped = 0
 
@@ -67,9 +67,9 @@ async def ingest_imd(session: AsyncSession) -> dict:
             continue
 
         if published:
-            occurred_at = datetime(*published[:6], tzinfo=timezone.utc)
+            occurred_at = datetime(*published[:6], tzinfo=UTC)
         else:
-            occurred_at = datetime.now(timezone.utc)
+            occurred_at = datetime.now(UTC)
 
         lat, lon = _extract_coords(summary)
         external_id = f"imd_{title[:60]}_{occurred_at.date()}"
@@ -89,7 +89,7 @@ async def ingest_imd(session: AsyncSession) -> dict:
                         INSERT INTO events (hazard_type, source, external_id, occurred_at, location, metadata)
                         VALUES (:hazard_type, :source, :external_id, :occurred_at,
                                 ST_SetSRID(ST_MakePoint(:lon, :lat), 4326)::geography,
-                                :metadata::jsonb)
+                                CAST(:metadata AS jsonb))
                         ON CONFLICT (source, external_id) DO NOTHING
                     """),
                     {**params, "lat": lat, "lon": lon},
@@ -98,7 +98,7 @@ async def ingest_imd(session: AsyncSession) -> dict:
                 await session.execute(
                     text("""
                         INSERT INTO events (hazard_type, source, external_id, occurred_at, metadata)
-                        VALUES (:hazard_type, :source, :external_id, :occurred_at, :metadata::jsonb)
+                        VALUES (:hazard_type, :source, :external_id, :occurred_at, CAST(:metadata AS jsonb))
                         ON CONFLICT (source, external_id) DO NOTHING
                     """),
                     params,

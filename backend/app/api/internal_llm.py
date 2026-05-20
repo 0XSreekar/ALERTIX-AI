@@ -5,12 +5,12 @@ import json
 import logging
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Header
+from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel
 
 from app.config import get_settings
 from app.llm import provider as llm
-from app.llm.prompts import get_template, SOS_TRIAGE
+from app.llm.prompts import SOS_TRIAGE, get_template
 
 log = logging.getLogger(__name__)
 settings = get_settings()
@@ -70,11 +70,13 @@ async def triage_sos(
         raise HTTPException(status_code=503, detail="all LLM providers failed")
     try:
         data = json.loads(raw)
-    except json.JSONDecodeError:
+    except json.JSONDecodeError as exc:
         import re
         match = re.search(r"\{.*\}", raw, re.DOTALL)
         if not match:
-            raise HTTPException(status_code=502, detail="LLM returned invalid JSON")
+            raise HTTPException(
+                status_code=502, detail="LLM returned invalid JSON"
+            ) from exc
         data = json.loads(match.group(0))
     return TriageResponse(**data, provider=provider)
 

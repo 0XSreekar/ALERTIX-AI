@@ -1,5 +1,4 @@
 import uuid
-from datetime import datetime
 
 from geoalchemy2 import Geography
 from sqlalchemy import ForeignKey, Index, String, Text

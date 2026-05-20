@@ -1,16 +1,15 @@
 import type { Alert, HazardEvent, SosReport, EarthquakePrediction, FloodPrediction } from "./types";
-import { supabase } from "./supabase";
+import { getToken } from "./localAuth";
 
-const BASE = import.meta.env.VITE_API_BASE_URL || "";
+const BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
 
-async function authHeaders(): Promise<Record<string, string>> {
-  const { data } = await supabase.auth.getSession();
-  const token = data.session?.access_token;
+function authHeaders(): Record<string, string> {
+  const token = getToken();
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
-  const headers = { ...(await authHeaders()), ...init?.headers };
+  const headers = { ...authHeaders(), ...init?.headers };
   const res = await fetch(`${BASE}${path}`, { ...init, headers });
   if (!res.ok) {
     const body = await res.text();

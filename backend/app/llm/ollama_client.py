@@ -1,6 +1,8 @@
 ﻿"""Ollama local LLM client (primary in the fallback ladder)."""
 from __future__ import annotations
+
 import httpx
+
 from app.config import get_settings
 
 

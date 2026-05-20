@@ -1,3 +1,6 @@
+"""Auth dependencies — decode local HS256 JWT (issued by /api/auth/login)."""
+from __future__ import annotations
+
 from dataclasses import dataclass
 from typing import Annotated
 
@@ -5,8 +8,6 @@ import jwt
 from fastapi import Depends, Header, HTTPException, status
 
 from app.config import get_settings
-
-settings = get_settings()
 
 
 @dataclass(frozen=True)
@@ -16,20 +17,14 @@ class CurrentUser:
     role: str  # 'citizen' | 'official' | 'admin'
 
 
-def _decode_supabase_jwt(token: str) -> dict:
-    """Verify a Supabase-issued JWT using the project's JWT secret (HS256)."""
-    if not settings.supabase_jwt_secret:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Supabase JWT secret not configured",
-        )
+def _jwt_secret() -> str:
+    return get_settings().supabase_jwt_secret or "local-dev-secret-change-in-prod"
+
+
+def _decode_jwt(token: str) -> dict:
+    """Verify a locally-issued HS256 JWT (issued by /api/auth/login or /signup)."""
     try:
-        return jwt.decode(
-            token,
-            settings.supabase_jwt_secret,
-            algorithms=["HS256"],
-            audience="authenticated",
-        )
+        return jwt.decode(token, _jwt_secret(), algorithms=["HS256"])
     except jwt.ExpiredSignatureError as exc:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Token expired"
@@ -49,6 +44,14 @@ def _extract_bearer(authorization: str | None) -> str | None:
     return parts[1].strip()
 
 
+def _from_payload(payload: dict) -> CurrentUser:
+    return CurrentUser(
+        user_id=payload["sub"],
+        email=payload.get("email"),
+        role=payload.get("role", "citizen"),
+    )
+
+
 async def current_user(
     authorization: Annotated[str | None, Header()] = None,
 ) -> CurrentUser:
@@ -57,12 +60,7 @@ async def current_user(
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing bearer token"
         )
-    payload = _decode_supabase_jwt(token)
-    return CurrentUser(
-        user_id=payload["sub"],
-        email=payload.get("email"),
-        role=(payload.get("user_metadata") or {}).get("role", "citizen"),
-    )
+    return _from_payload(_decode_jwt(token))
 
 
 async def current_user_optional(
@@ -72,14 +70,9 @@ async def current_user_optional(
     if not token:
         return None
     try:
-        payload = _decode_supabase_jwt(token)
+        return _from_payload(_decode_jwt(token))
     except HTTPException:
         return None
-    return CurrentUser(
-        user_id=payload["sub"],
-        email=payload.get("email"),
-        role=(payload.get("user_metadata") or {}).get("role", "citizen"),
-    )
 
 
 def require_role(*roles: str):
@@ -101,7 +94,7 @@ async def verify_cron_token(
     x_cron_token: Annotated[str | None, Header(alias="X-Cron-Token")] = None,
 ) -> None:
     """Internal-endpoint guard for GitHub-Actions-triggered cron jobs."""
-    if not x_cron_token or x_cron_token != settings.cron_token:
+    if not x_cron_token or x_cron_token != get_settings().cron_token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid cron token"
         )

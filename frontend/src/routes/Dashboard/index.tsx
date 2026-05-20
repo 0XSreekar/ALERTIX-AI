@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
-import { supabase } from "@/lib/supabase";
+import { getUser, signOut } from "@/lib/localAuth";
 import RegionSelector from "@/components/RegionSelector";
 import Footer from "@/components/Footer";
 import { cn } from "@/lib/utils";
@@ -22,13 +22,17 @@ export default function Dashboard() {
   const location = useLocation();
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      if (!data.session) {
-        navigate("/login");
-      }
-      setLoading(false);
-    });
+    const user = getUser();
+    if (!user) {
+      navigate("/login");
+    }
+    setLoading(false);
   }, [navigate]);
+
+  const handleLogout = () => {
+    signOut();
+    navigate("/");
+  };
 
   if (loading) {
     return (
@@ -50,7 +54,7 @@ export default function Dashboard() {
           </Link>
           <RegionSelector />
           <button
-            onClick={() => supabase.auth.signOut().then(() => navigate("/"))}
+            onClick={handleLogout}
             className="text-sm text-muted-foreground hover:text-foreground"
           >
             Logout

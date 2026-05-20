@@ -66,3 +66,5 @@ backend/alembic/__pycache__/
 # Playwright
 playwright-report/
 test-results/
+tsconfig.tsbuildinfo
+setup_db.sql

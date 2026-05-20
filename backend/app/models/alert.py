@@ -3,7 +3,7 @@ from datetime import datetime
 
 from geoalchemy2 import Geography
 from sqlalchemy import Float, Index, String, Text
-from sqlalchemy.dialects.postgresql import ARRAY, JSONB, UUID
+from sqlalchemy.dialects.postgresql import ARRAY, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base

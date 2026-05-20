@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import Map from "@/components/Map";
+import HazardMap from "@/components/Map";
 import RiskGauge from "@/components/RiskGauge";
 import { fetchRecentEvents, fetchEarthquakePrediction } from "@/lib/api";
 import { earthquakeEventsWs } from "@/lib/ws";
@@ -29,8 +29,10 @@ export default function EarthquakeTab() {
     return unsub;
   }, []);
 
-  const allEvents = [...liveEvents, ...(data?.events || [])];
-  const uniqueEvents = Array.from(new Map(allEvents.map((e) => [e.id, e])).values());
+  const allEvents: HazardEvent[] = [...liveEvents, ...(data?.events ?? [])];
+  const uniqueEvents: HazardEvent[] = Array.from(
+    new globalThis.Map<string, HazardEvent>(allEvents.map((e) => [e.id, e])).values(),
+  );
 
   return (
     <div className="space-y-6">
@@ -49,7 +51,7 @@ export default function EarthquakeTab() {
       </div>
 
       {/* Map */}
-      <Map
+      <HazardMap
         events={uniqueEvents}
         className="h-[400px] w-full rounded-lg lg:h-[500px]"
       />

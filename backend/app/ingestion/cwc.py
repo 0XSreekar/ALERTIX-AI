@@ -5,7 +5,7 @@ Respects robots and rate limits.
 """
 
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import httpx
 from bs4 import BeautifulSoup
@@ -92,7 +92,7 @@ def _parse_gauge_data(html: str) -> list[dict]:
 async def ingest_cwc(session: AsyncSession) -> dict:
     html = await _fetch_cwc_page()
     gauge_data = _parse_gauge_data(html)
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     inserted = 0
 
     for gauge in gauge_data:
@@ -106,7 +106,7 @@ async def ingest_cwc(session: AsyncSession) -> dict:
                     ) VALUES (
                         'flood', 'cwc', :external_id, :occurred_at,
                         ST_SetSRID(ST_MakePoint(:lon, :lat), 4326)::geography,
-                        :intensity, :metadata::jsonb
+                        :intensity, CAST(:metadata AS jsonb)
                     )
                     ON CONFLICT (source, external_id) DO NOTHING
                 """),

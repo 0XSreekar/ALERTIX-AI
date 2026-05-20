@@ -3,11 +3,10 @@
 Pulls `all_hour` (every 60s cron) and upserts into events table by (source, external_id).
 """
 
-from datetime import datetime, timezone
+import json
+from datetime import UTC, datetime
 
 import httpx
-from sqlalchemy import func, text
-from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.logging import get_logger
@@ -44,7 +43,7 @@ def _parse_feature(feature: dict) -> dict | None:
     if time_ms is None:
         return None
 
-    occurred_at = datetime.fromtimestamp(time_ms / 1000, tz=timezone.utc)
+    occurred_at = datetime.fromtimestamp(time_ms / 1000, tz=UTC)
     external_id = feature.get("id") or props.get("code")
 
     tsunami_flag = bool(props.get("tsunami", 0))
@@ -92,7 +91,6 @@ async def ingest_usgs(session: AsyncSession, feed: str = "all_hour") -> dict:
             continue
 
         try:
-            import json as _json
             sql = (
                 "INSERT INTO events "
                 "(hazard_type, source, external_id, occurred_at, "
@@ -109,7 +107,7 @@ async def ingest_usgs(session: AsyncSession, feed: str = "all_hour") -> dict:
                 parsed["hazard_type"], parsed["source"], parsed["external_id"],
                 parsed["occurred_at"], parsed["longitude"], parsed["latitude"],
                 parsed["magnitude"], parsed["depth_km"], parsed["intensity"],
-                _json.dumps(parsed["metadata"]),
+                json.dumps(parsed["metadata"]),
             )
             conn = await session.connection()
             result = await conn.exec_driver_sql(sql, params)

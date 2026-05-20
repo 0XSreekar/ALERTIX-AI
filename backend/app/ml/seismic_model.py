@@ -25,7 +25,7 @@ try:
             self.decoder = nn.LSTM(hidden_size, hidden_size, num_layers, batch_first=True)
             self.output_layer = nn.Linear(hidden_size, input_size)
 
-        def forward(self, x: "torch.Tensor") -> "torch.Tensor":
+        def forward(self, x: torch.Tensor) -> torch.Tensor:
             _, (h, _) = self.encoder(x)
             bottleneck = h[-1].unsqueeze(1).repeat(1, self.seq_len, 1)
             out, _ = self.decoder(bottleneck)
