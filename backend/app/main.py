@@ -75,8 +75,10 @@ app.include_router(contact_router)
 
 # ── Internal routers ───────────────────────────────────────────
 from app.api.internal_ingest import router as ingest_router  # noqa: E402
+from app.api.internal_llm import router as llm_router  # noqa: E402
 
 app.include_router(ingest_router)
+app.include_router(llm_router)
 
 # ── WebSocket ──────────────────────────────────────────────────
 from app.ws.alerts import router as ws_router  # noqa: E402

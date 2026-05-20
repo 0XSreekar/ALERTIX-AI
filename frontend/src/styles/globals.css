@@ -34,6 +34,12 @@
   }
 }
 
+/* Scrolling ticker animation */
+@keyframes slide {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
 /* Leaflet overrides for dark theme */
 .leaflet-container {
   background: hsl(222 47% 6%);

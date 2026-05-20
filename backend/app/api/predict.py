@@ -1,5 +1,4 @@
-"""Prediction endpoints — Phase 1 returns data-driven summaries.
-Phase 2 will wire in the actual ML models."""
+"""Prediction endpoints — Phase 2 wires in ML models and LLM explanations."""
 
 from datetime import datetime, timedelta, timezone
 
@@ -8,6 +7,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db import get_session
+from app.ml.seismic_autoencoder import omori_aftershock_probability
 from app.schemas.predict import (
     CyclonePrediction,
     EarthquakePrediction,
@@ -68,12 +68,19 @@ async def predict_earthquake(
     )
     ms = mainshock.fetchone()
 
+    aftershock_24h = None
+    aftershock_7d = None
+    if ms:
+        hours_since = (datetime.now(timezone.utc) - ms.occurred_at).total_seconds() / 3600
+        aftershock_24h = omori_aftershock_probability(ms.magnitude, hours_since)
+        aftershock_7d = omori_aftershock_probability(ms.magnitude, max(0, hours_since - 144))
+
     return EarthquakePrediction(
         anomaly_score=float(row.avg_anomaly) if row.avg_anomaly else None,
-        aftershock_24h_probability=0.6 if ms else None,  # placeholder — Phase 2 Omori
-        aftershock_7d_probability=0.85 if ms else None,
+        aftershock_24h_probability=aftershock_24h,
+        aftershock_7d_probability=aftershock_7d,
         recent_event_count=row.cnt or 0,
-        model_version="phase1-stats",
+        model_version="phase2-omori",
     )
 
 

@@ -1,17 +1,18 @@
 """SOS citizen report API — POST /api/sos, GET /api/sos/mine, GET /api/sos/feed."""
 
+import asyncio
 import json
 from datetime import datetime, timezone
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.deps import CurrentUser, current_user, current_user_optional, require_role
-from app.db import get_session
+from app.db import get_session, async_session_factory
 from app.logging import get_logger
 from app.schemas.sos import SosCreate, SosOut
 
@@ -21,11 +22,42 @@ router = APIRouter(prefix="/api/sos", tags=["sos"])
 limiter = Limiter(key_func=get_remote_address)
 
 
+async def _run_llm_triage(sos_id: str, raw_text: str, location_text: str) -> None:
+    """Background task: LLM triage scoring written back to DB."""
+    try:
+        from app.llm import provider as llm
+        from app.llm.prompts import SOS_TRIAGE
+        prompt = SOS_TRIAGE.format(message=raw_text, location=location_text or "unknown")
+        raw, _provider = await llm.generate(prompt)
+        if not raw:
+            return
+        import re
+        match = re.search(r"\{.*\}", raw, re.DOTALL)
+        if not match:
+            return
+        data = json.loads(match.group(0))
+        async with async_session_factory() as sess:
+            await sess.execute(
+                text("""
+                    UPDATE sos_reports
+                    SET urgency_score = :score,
+                        llm_summary   = :summary,
+                        triaged       = TRUE
+                    WHERE id = :id
+                """),
+                {"score": data.get("urgency_score"), "summary": data.get("summary"), "id": sos_id},
+            )
+            await sess.commit()
+    except Exception as exc:
+        log.warning("sos_triage_failed sos_id=%s err=%s", sos_id, exc)
+
+
 @router.post("")
 @limiter.limit("5/hour")
 async def submit_sos(
     request: Request,
     body: SosCreate,
+    background_tasks: BackgroundTasks,
     session: AsyncSession = Depends(get_session),
     user: CurrentUser | None = Depends(current_user_optional),
 ) -> dict:
@@ -74,6 +106,10 @@ async def submit_sos(
     await session.commit()
 
     log.info("sos_submitted", sos_id=str(row.id), has_location=body.latitude is not None)
+
+    # Kick off async LLM triage (non-blocking)
+    background_tasks.add_task(_run_llm_triage, str(row.id), body.raw_text, "")
+
     return {"id": str(row.id), "created_at": row.created_at.isoformat(), "status": "received"}
 
 

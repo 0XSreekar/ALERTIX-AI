@@ -30,6 +30,9 @@ class Base(DeclarativeBase):
     """Common declarative base for all ORM models."""
 
 
+async_session_factory = AsyncSessionLocal
+
+
 async def get_session() -> AsyncIterator[AsyncSession]:
     """FastAPI dependency yielding a transactional async session."""
     async with AsyncSessionLocal() as session:
