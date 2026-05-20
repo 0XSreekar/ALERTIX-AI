@@ -6,7 +6,8 @@ Pulls `all_hour` (every 60s cron) and upserts into events table by (source, exte
 from datetime import datetime, timezone
 
 import httpx
-from sqlalchemy import text
+from sqlalchemy import func, text
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.logging import get_logger
@@ -91,37 +92,27 @@ async def ingest_usgs(session: AsyncSession, feed: str = "all_hour") -> dict:
             continue
 
         try:
-            result = await session.execute(
-                text("""
-                    INSERT INTO events (
-                        hazard_type, source, external_id, occurred_at,
-                        location, magnitude, depth_km, intensity, metadata
-                    ) VALUES (
-                        :hazard_type, :source, :external_id, :occurred_at,
-                        ST_SetSRID(ST_MakePoint(:longitude, :latitude), 4326)::geography,
-                        :magnitude, :depth_km, :intensity,
-                        :metadata::jsonb
-                    )
-                    ON CONFLICT (source, external_id) DO UPDATE SET
-                        magnitude = EXCLUDED.magnitude,
-                        depth_km = EXCLUDED.depth_km,
-                        intensity = EXCLUDED.intensity,
-                        metadata = EXCLUDED.metadata
-                    RETURNING id
-                """),
-                {
-                    "hazard_type": parsed["hazard_type"],
-                    "source": parsed["source"],
-                    "external_id": parsed["external_id"],
-                    "occurred_at": parsed["occurred_at"],
-                    "longitude": parsed["longitude"],
-                    "latitude": parsed["latitude"],
-                    "magnitude": parsed["magnitude"],
-                    "depth_km": parsed["depth_km"],
-                    "intensity": parsed["intensity"],
-                    "metadata": __import__("json").dumps(parsed["metadata"]),
-                },
+            import json as _json
+            sql = (
+                "INSERT INTO events "
+                "(hazard_type, source, external_id, occurred_at, "
+                " location, magnitude, depth_km, intensity, metadata) "
+                "VALUES ($1,$2,$3,$4,"
+                " ST_SetSRID(ST_MakePoint($5,$6),4326),"
+                " $7,$8,$9,CAST($10 AS jsonb)) "
+                "ON CONFLICT (source, external_id) DO UPDATE SET "
+                " magnitude=EXCLUDED.magnitude, depth_km=EXCLUDED.depth_km,"
+                " intensity=EXCLUDED.intensity, metadata=EXCLUDED.metadata "
+                "RETURNING id"
             )
+            params = (
+                parsed["hazard_type"], parsed["source"], parsed["external_id"],
+                parsed["occurred_at"], parsed["longitude"], parsed["latitude"],
+                parsed["magnitude"], parsed["depth_km"], parsed["intensity"],
+                _json.dumps(parsed["metadata"]),
+            )
+            conn = await session.connection()
+            result = await conn.exec_driver_sql(sql, params)
             row = result.fetchone()
             if row:
                 inserted += 1

@@ -1,7 +1,7 @@
 ﻿"""Groq cloud LLM client (first fallback)."""
 from __future__ import annotations
 import httpx
-from app.config import settings
+from app.config import get_settings
 
 
 class GroqClient:
@@ -9,9 +9,10 @@ class GroqClient:
     MODEL = "llama-3.3-70b-versatile"
 
     async def generate(self, prompt: str) -> str:
-        if not settings.GROQ_API_KEY:
+        settings = get_settings()
+        if not settings.groq_api_key:
             raise RuntimeError("GROQ_API_KEY not set")
-        headers = {"Authorization": f"Bearer {settings.GROQ_API_KEY}",
+        headers = {"Authorization": f"Bearer {settings.groq_api_key}",
                    "Content-Type": "application/json"}
         payload = {"model": self.MODEL,
                    "messages": [{"role": "user", "content": prompt}],

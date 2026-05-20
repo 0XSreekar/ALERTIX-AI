@@ -1,12 +1,12 @@
 ﻿"""Ollama local LLM client (primary in the fallback ladder)."""
 from __future__ import annotations
 import httpx
-from app.config import settings
+from app.config import get_settings
 
 
 class OllamaClient:
     def __init__(self) -> None:
-        self.base_url = settings.OLLAMA_URL.rstrip("/")
+        self.base_url = get_settings().ollama_url.rstrip("/")
         self.model = "qwen2.5:7b"
         self.timeout = 60.0
 
