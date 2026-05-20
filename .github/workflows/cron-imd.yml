@@ -1,0 +1,22 @@
+name: Cron — IMD Cyclone Ingestion
+
+on:
+  schedule:
+    - cron: "0,30 * * * *"
+  workflow_dispatch:
+
+jobs:
+  ingest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Trigger IMD ingestion
+        env:
+          BACKEND_URL: ${{ secrets.BACKEND_URL }}
+          CRON_TOKEN: ${{ secrets.CRON_TOKEN }}
+        run: |
+          curl -sf -X POST \
+            -H "X-Cron-Token: $CRON_TOKEN" \
+            "${BACKEND_URL}/internal/ingest/imd" \
+            --max-time 90 \
+            || echo "Request failed or timed out"
