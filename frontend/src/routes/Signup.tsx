@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { supabase } from "@/lib/supabase";
+import { signUp } from "@/lib/localAuth";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { Button } from "@/components/ui/button";
@@ -19,18 +19,14 @@ export default function Signup() {
     e.preventDefault();
     setError("");
     setLoading(true);
-    const { error: err } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: { full_name: fullName, role: "citizen" },
-      },
-    });
-    setLoading(false);
-    if (err) {
-      setError(err.message);
-    } else {
+    try {
+      await signUp(email, password, fullName);
       setSuccess(true);
+      setTimeout(() => navigate("/dashboard"), 1500);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Signup failed");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -42,10 +38,7 @@ export default function Signup() {
           <h1 className="mb-6 text-center text-3xl font-bold">Sign Up</h1>
           {success ? (
             <div className="text-center">
-              <p className="mb-4 text-green-400">Account created! Check your email to confirm.</p>
-              <Link to="/login">
-                <Button>Go to Login</Button>
-              </Link>
+              <p className="mb-4 text-green-400">Account created! Redirecting to dashboard...</p>
             </div>
           ) : (
             <>

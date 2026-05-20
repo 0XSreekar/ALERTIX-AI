@@ -1,33 +1,21 @@
 import { Link, useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
-import { supabase } from "@/lib/supabase";
+import { getUser, signOut, type LocalUser } from "@/lib/localAuth";
 import { Button } from "@/components/ui/button";
-import type { User } from "@supabase/supabase-js";
 
 export default function Navbar() {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<LocalUser | null>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => setUser(data.user)).catch(() => setUser(null));
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
-    });
-    return () => {
-      try {
-        listener?.subscription.unsubscribe();
-      } catch (e) {
-        // Ignore unsubscribe errors
-      }
-    };
+    setUser(getUser());
+    const onStorage = () => setUser(getUser());
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
   }, []);
 
-  const handleLogout = async () => {
-    try {
-      await supabase.auth.signOut();
-    } catch (e) {
-      // Ignore errors
-    }
+  const handleLogout = () => {
+    signOut();
     setUser(null);
     navigate("/");
   };
