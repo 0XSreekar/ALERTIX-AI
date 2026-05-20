@@ -1,9 +1,10 @@
-﻿"""LSTM Autoencoder architecture definition.
+"""LSTM Autoencoder architecture definition.
 
 Input: sequence of seismic features (30-day rolling window, 8 features/step).
 Encoder: 2-layer LSTM -> bottleneck.
 Decoder: repeat -> 2-layer LSTM -> linear.
 """
+
 from __future__ import annotations
 
 try:

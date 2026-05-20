@@ -83,7 +83,7 @@ The cron workflows will start running automatically:
 - FIRMS: every hour at :15
 - IMD: every 30 minutes
 - CWC: every 30 minutes
-- Google Flood Hub: every 15 minutes
+- Flood ingestion: every 30 minutes via CWC and configured official bulletin URLs
 
 ## Step 9: Verify
 

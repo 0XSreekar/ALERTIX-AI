@@ -25,11 +25,13 @@ async def _run_llm_triage(sos_id: str, raw_text: str, location_text: str) -> Non
     try:
         from app.llm import provider as llm
         from app.llm.prompts import SOS_TRIAGE
+
         prompt = SOS_TRIAGE.format(message=raw_text, location=location_text or "unknown")
         raw, _provider = await llm.generate(prompt)
         if not raw:
             return
         import re
+
         match = re.search(r"\{.*\}", raw, re.DOTALL)
         if not match:
             return
@@ -87,6 +89,8 @@ async def submit_sos(
         params,
     )
     row = result.fetchone()
+    if row is None:
+        raise HTTPException(status_code=500, detail="SOS insert failed")
     await session.commit()
 
     # Audit log

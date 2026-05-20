@@ -6,11 +6,12 @@ Full details in Section 5 of `ALERTIX_AI_DOCUMENTATION.md`.
 |--------|--------|-----------|-------------|--------|
 | USGS Earthquake Hazards | Earthquake | every 60s | No | `ingestion/usgs.py` |
 | IRIS FDSN | Earthquake (waveforms) | on-demand | No | `ingestion/iris.py` |
-| Google Flood Hub | Flood | every 15 min | Yes | `ingestion/google_flood_hub.py` |
-| CWC India | Flood (gauges) | every 30 min | No (scraped) | `ingestion/cwc.py` |
-| IMD | Cyclone + rainfall | every 30 min | No (RSS) | `ingestion/imd_cyclone.py` |
-| NASA FIRMS | Wildfire | every 60 min | Yes (MAP_KEY) | `ingestion/nasa_firms.py` |
-| Open-Meteo | Weather (all hazards) | on-demand | No | `ingestion/open_meteo.py` |
+| CWC India | Flood (gauges) | every 30 min | No (HTML) | `ingestion/flood/` |
+| Official state bulletins | Flood | configured | No/varies | `ingestion/flood/` |
+| IMD/RSMC | Cyclone | every 30 min | No (HTML) | `ingestion/cyclone/` |
+| JTWC | Cyclone | every 30 min | No (text/HTML) | `ingestion/cyclone/` |
+| NASA FIRMS | Wildfire | every 60 min | Yes (MAP_KEY) | `ingestion/wildfire/` |
+| Open-Meteo | Weather/rainfall | configured | No | `ingestion/weather/` |
 | GSI India | Landslide zones | static | No | Static GeoJSON overlay |
 | Sentinel-1 SAR | Flood extent | on-demand | Yes (Sentinel Hub) | Phase 2 |
 

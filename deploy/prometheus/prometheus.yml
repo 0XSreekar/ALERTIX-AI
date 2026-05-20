@@ -1,0 +1,12 @@
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: "alertix-api"
+    metrics_path: "/api/processing/metrics"
+    static_configs:
+      - targets: ["backend:8000"]
+  - job_name: "alertix-processing"
+    metrics_path: "/api/processing/metrics"
+    static_configs:
+      - targets: ["backend:8000"]

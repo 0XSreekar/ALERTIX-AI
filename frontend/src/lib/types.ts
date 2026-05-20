@@ -66,7 +66,8 @@ export interface FloodPrediction {
   basin_id: string | null;
   basin_name: string | null;
   forecast: FloodForecastPoint[];
-  google_flood_hub_agrees: boolean | null;
+  official_bulletin_agrees: boolean | null;
+  google_flood_hub_agrees?: boolean | null;
   model_version: string | null;
 }
 

@@ -1,4 +1,5 @@
 """Auth dependencies — decode local HS256 JWT (issued by /api/auth/login)."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -57,9 +58,7 @@ async def current_user(
 ) -> CurrentUser:
     token = _extract_bearer(authorization)
     if not token:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing bearer token"
-        )
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing bearer token")
     return _from_payload(_decode_jwt(token))
 
 
@@ -95,6 +94,4 @@ async def verify_cron_token(
 ) -> None:
     """Internal-endpoint guard for GitHub-Actions-triggered cron jobs."""
     if not x_cron_token or x_cron_token != get_settings().cron_token:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid cron token"
-        )
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid cron token")

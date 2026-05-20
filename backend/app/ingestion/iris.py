@@ -22,7 +22,7 @@ async def fetch_iris_events(
     Returns QuakeML-style GeoJSON when format=geojson is supported,
     or raw text. Used for backfill and historical analysis.
     """
-    params = {
+    params: dict[str, str | int | float] = {
         "format": "text",
         "minlat": min_lat,
         "maxlat": max_lat,

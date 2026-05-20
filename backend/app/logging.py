@@ -1,4 +1,5 @@
 import logging
+from typing import Any, cast
 
 import structlog
 
@@ -24,7 +25,7 @@ def configure_logging() -> None:
         processors.append(structlog.dev.ConsoleRenderer())
 
     structlog.configure(
-        processors=processors,
+        processors=cast(Any, processors),
         wrapper_class=structlog.make_filtering_bound_logger(level),
         cache_logger_on_first_use=True,
     )

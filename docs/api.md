@@ -36,6 +36,8 @@ Full surface defined in Section 9 of `ALERTIX_AI_DOCUMENTATION.md`. Interactive 
 | POST | /internal/ingest/firms | Trigger FIRMS ingestion |
 | POST | /internal/ingest/imd | Trigger IMD ingestion |
 | POST | /internal/ingest/cwc | Trigger CWC ingestion |
-| POST | /internal/ingest/google_flood_hub | Trigger GFH ingestion |
+| POST | /internal/ingest/flood | Trigger CWC + official flood bulletin ingestion |
+| POST | /internal/ingest/weather | Trigger configured Open-Meteo rainfall ingestion |
+| POST | /internal/ingest/cyclones | Trigger IMD/RSMC + JTWC cyclone ingestion |
 | POST | /internal/llm/explain | Generate alert explanation (Phase 2) |
 | POST | /internal/llm/triage_sos | Triage SOS report (Phase 2) |

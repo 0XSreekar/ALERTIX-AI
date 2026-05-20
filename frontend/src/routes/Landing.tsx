@@ -18,7 +18,7 @@ const hazards = [
   {
     icon: "🌊",
     title: "Floods",
-    desc: "CWC river gauges + Open-Meteo 72-hr rainfall. Sentinel-1 SAR flood extent mapping. Google Flood Hub fusion.",
+    desc: "CWC river gauges + Open-Meteo rainfall. Official flood bulletins and Sentinel-1 SAR flood extent mapping.",
     color: "from-blue-950/60 to-blue-900/30",
     border: "border-blue-800/40",
   },
@@ -60,7 +60,7 @@ const stats = [
 ];
 
 const stack = [
-  "USGS", "IMD", "NASA FIRMS", "CWC", "Google Flood Hub",
+  "USGS", "IMD", "NASA FIRMS", "CWC",
   "Sentinel-1", "Open-Meteo", "GSI", "Ollama", "FastAPI", "Supabase",
 ];
 

@@ -1,4 +1,5 @@
-﻿"""Ollama local LLM client (primary in the fallback ladder)."""
+"""Ollama local LLM client (primary in the fallback ladder)."""
+
 from __future__ import annotations
 
 import httpx
@@ -14,8 +15,12 @@ class OllamaClient:
 
     async def generate(self, prompt: str) -> str:
         url = f"{self.base_url}/api/generate"
-        payload = {"model": self.model, "prompt": prompt, "stream": False,
-                   "options": {"temperature": 0.3, "top_p": 0.9}}
+        payload = {
+            "model": self.model,
+            "prompt": prompt,
+            "stream": False,
+            "options": {"temperature": 0.3, "top_p": 0.9},
+        }
         async with httpx.AsyncClient(timeout=self.timeout) as client:
             resp = await client.post(url, json=payload)
             resp.raise_for_status()

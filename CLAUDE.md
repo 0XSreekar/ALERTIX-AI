@@ -90,4 +90,4 @@ Frontend env vars must be prefixed with `VITE_`.
 
 ## External data sources
 
-USGS (earthquakes), IRIS (waveforms), IMD (cyclones/rainfall), NASA FIRMS (wildfires), Google Flood Hub, CWC India (river gauges), Open-Meteo (weather), GSI (landslide zones), Sentinel-1 (SAR for flood extent). All free for non-commercial use.
+USGS (earthquakes), IRIS (waveforms), IMD/RSMC + JTWC (cyclones), NASA FIRMS (wildfires), CWC India (river gauges), official flood bulletins, Open-Meteo (weather/rainfall), GSI (landslide zones), Sentinel-1 (SAR for flood extent). All free for non-commercial use.

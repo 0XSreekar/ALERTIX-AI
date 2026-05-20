@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 const hazards = [
   { name: "Earthquake", status: "Real AI (proprietary)", tech: "LSTM autoencoder + Omori law + LLM characterization" },
-  { name: "Flood", status: "Real AI (proprietary)", tech: "LSTM discharge + U-Net extent + Google Flood Hub fusion" },
+  { name: "Flood", status: "Real AI (proprietary)", tech: "CWC river gauges + Open-Meteo rainfall + U-Net extent" },
   { name: "Cyclone", status: "Live data integration", tech: "IMD bulletins + Open-Meteo wind fields" },
   { name: "Wildfire", status: "Live data integration", tech: "NASA FIRMS VIIRS/MODIS hotspot detection" },
   { name: "Landslide", status: "Static + rule-based", tech: "GSI hazard zonation + rainfall threshold rules" },

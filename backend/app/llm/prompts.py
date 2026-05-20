@@ -1,4 +1,4 @@
-﻿"""Prompt templates for all LLM calls."""
+"""Prompt templates for all LLM calls."""
 
 EARTHQUAKE_EXPLAIN = """You are Alertix AI, an Indian disaster-intelligence assistant.
 

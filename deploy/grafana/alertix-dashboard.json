@@ -1,0 +1,27 @@
+{
+  "title": "ALERTIX Operations",
+  "schemaVersion": 39,
+  "version": 1,
+  "panels": [
+    {
+      "type": "timeseries",
+      "title": "Processed Events",
+      "targets": [{ "expr": "sum(alertix_processing_processed_total) by (consumer)" }]
+    },
+    {
+      "type": "timeseries",
+      "title": "Processing Failures",
+      "targets": [{ "expr": "sum(alertix_processing_failed_total) by (consumer)" }]
+    },
+    {
+      "type": "timeseries",
+      "title": "Dead Letter Queue",
+      "targets": [{ "expr": "sum(alertix_processing_dlq_total) by (consumer)" }]
+    },
+    {
+      "type": "timeseries",
+      "title": "Average Processing Latency",
+      "targets": [{ "expr": "avg(alertix_processing_avg_latency_ms) by (consumer)" }]
+    }
+  ]
+}

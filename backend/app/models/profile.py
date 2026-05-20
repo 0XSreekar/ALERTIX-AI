@@ -12,9 +12,7 @@ from app.db import Base
 class Profile(Base):
     __tablename__ = "profiles"
 
-    user_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True
-    )
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True)
     full_name: Mapped[str | None] = mapped_column(Text)
     role: Mapped[str] = mapped_column(String, nullable=False, default="citizen")
     home_location: Mapped[str | None] = mapped_column(Geography("POINT", srid=4326))

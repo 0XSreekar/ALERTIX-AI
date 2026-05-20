@@ -64,7 +64,9 @@ async def list_events(
                 conditions.append(
                     "ST_Intersects(location, ST_MakeEnvelope(:minlon, :minlat, :maxlon, :maxlat, 4326)::geography)"
                 )
-                params.update({"minlon": minlon, "minlat": minlat, "maxlon": maxlon, "maxlat": maxlat})
+                params.update(
+                    {"minlon": minlon, "minlat": minlat, "maxlon": maxlon, "maxlat": maxlat}
+                )
             except ValueError:
                 pass
 

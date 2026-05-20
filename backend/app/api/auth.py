@@ -1,5 +1,6 @@
-﻿"""Local auth endpoints — POST /api/auth/signup, /api/auth/login, /api/auth/me.
+"""Local auth endpoints — POST /api/auth/signup, /api/auth/login, /api/auth/me.
 Uses bcrypt + HS256 JWT. No Supabase required for local dev."""
+
 from __future__ import annotations
 
 import uuid
@@ -25,6 +26,7 @@ def _hash(password: str) -> str:
 
 def _verify(password: str, hashed: str) -> bool:
     return bcrypt.checkpw(password.encode(), hashed.encode())
+
 
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRE_HOURS = 72
@@ -98,7 +100,9 @@ async def signup(body: SignupRequest, session: AsyncSession = Depends(get_sessio
 @router.post("/login", response_model=AuthResponse)
 async def login(body: LoginRequest, session: AsyncSession = Depends(get_session)) -> AuthResponse:
     result = await session.execute(
-        text("SELECT user_id, email, full_name, role, password_hash FROM profiles WHERE email = :email"),
+        text(
+            "SELECT user_id, email, full_name, role, password_hash FROM profiles WHERE email = :email"
+        ),
         {"email": body.email.lower()},
     )
     row = result.fetchone()

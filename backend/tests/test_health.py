@@ -7,6 +7,7 @@ from httpx import ASGITransport, AsyncClient
 @pytest.mark.asyncio
 async def test_health_endpoint():
     from app.main import app
+
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         response = await client.get("/health")
@@ -17,6 +18,7 @@ async def test_health_endpoint():
 @pytest.mark.asyncio
 async def test_version_endpoint():
     from app.main import app
+
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         response = await client.get("/version")

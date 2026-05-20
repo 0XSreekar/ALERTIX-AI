@@ -28,7 +28,7 @@ class FloodPrediction(BaseModel):
     basin_id: str | None = None
     basin_name: str | None = None
     forecast: list[FloodForecastPoint] = []
-    google_flood_hub_agrees: bool | None = None
+    official_bulletin_agrees: bool | None = None
     model_version: str | None = None
 
 
@@ -44,12 +44,13 @@ class CyclonePrediction(BaseModel):
 
 
 class WildfireCluster(BaseModel):
-    cluster_id: int
     centroid_lat: float
     centroid_lon: float
-    hotspot_count: int
-    mean_frp: float
-    risk: str
+    size: int
+    avg_frp: float | None = None
+    risk_level: str
+    earliest: str | None = None
+    latest: str | None = None
 
 
 class WildfirePrediction(BaseModel):

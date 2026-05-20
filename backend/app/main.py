@@ -1,5 +1,6 @@
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from typing import Any, cast
 
 import sentry_sdk
 from fastapi import FastAPI
@@ -47,7 +48,7 @@ app = FastAPI(
 )
 
 app.state.limiter = limiter
-app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_exception_handler(RateLimitExceeded, cast(Any, _rate_limit_exceeded_handler))
 
 app.add_middleware(
     CORSMiddleware,
@@ -58,21 +59,27 @@ app.add_middleware(
 )
 
 # ── Public API routers ─────────────────────────────────────────
+from app.api.ai import router as ai_router  # noqa: E402
 from app.api.alerts import router as alerts_router  # noqa: E402
 from app.api.auth import router as auth_router  # noqa: E402
+from app.api.citizen_reports import router as citizen_reports_router  # noqa: E402
 from app.api.contact import router as contact_router  # noqa: E402
 from app.api.damage import router as damage_router  # noqa: E402
 from app.api.events import router as events_router  # noqa: E402
 from app.api.predict import router as predict_router  # noqa: E402
+from app.api.processing import router as processing_router  # noqa: E402
 from app.api.sos import router as sos_router  # noqa: E402
 
 app.include_router(auth_router)
+app.include_router(ai_router)
 app.include_router(events_router)
 app.include_router(alerts_router)
 app.include_router(sos_router)
 app.include_router(predict_router)
 app.include_router(damage_router)
 app.include_router(contact_router)
+app.include_router(processing_router)
+app.include_router(citizen_reports_router)
 
 # ── Internal routers ───────────────────────────────────────────
 from app.api.internal_ingest import router as ingest_router  # noqa: E402

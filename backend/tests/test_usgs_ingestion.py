@@ -1,6 +1,5 @@
 """Tests for USGS ingestion module — parsing logic (no DB required)."""
 
-import pytest
 from app.ingestion.usgs import _parse_feature
 
 

@@ -1,4 +1,5 @@
-﻿"""LLM provider -- Ollama -> Groq -> Gemini fallback ladder."""
+"""LLM provider -- Ollama -> Groq -> Gemini fallback ladder."""
+
 from __future__ import annotations
 
 import logging

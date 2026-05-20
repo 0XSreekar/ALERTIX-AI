@@ -46,7 +46,7 @@
 
 ## 1. Executive Summary
 
-Alertix AI is a real-time multi-hazard monitoring, prediction, and early-warning platform built for the Indian context. It combines live data ingestion from public sources (USGS, IRIS, IMD, NASA FIRMS, Google Flood Hub, Open-Meteo), classical and deep learning models, and a locally-hosted Large Language Model that produces plain-language alert explanations and triages citizen Save-Our-Souls (SOS) reports.
+Alertix AI is a real-time multi-hazard monitoring, prediction, and early-warning platform built for the Indian context. It combines live data ingestion from public sources (USGS, IRIS, IMD/RSMC, JTWC, NASA FIRMS, CWC, Open-Meteo), classical and deep learning models, and a locally-hosted Large Language Model that produces plain-language alert explanations and triages citizen Save-Our-Souls (SOS) reports.
 
 The platform is built by a single developer in four weeks on consumer hardware (RTX 3060, 16 GB RAM) using exclusively free-tier services. It covers six hazard categories: **earthquakes, floods, cyclones, wildfires, landslides, and post-disaster damage assessment**. Two of those hazards (earthquakes and floods) have proprietary AI models trained as part of the build; the remaining four are powered by reliable public live-data feeds and surfaced through a unified operational dashboard.
 
@@ -82,7 +82,7 @@ This section exists because over-claiming kills disaster-tech startups when the 
 | Hazard | Status | What runs underneath |
 |---|---|---|
 | Earthquake | Real AI (proprietary) | LSTM autoencoder on USGS waveform features; aftershock probability via Omori law fit; LLM characterization |
-| Flood | Real AI (proprietary + partner data) | LSTM discharge forecast on CWC + Open-Meteo; U-Net flood extent on Sentinel-1; Google Flood Hub forecasts as additional input |
+| Flood | Real AI (proprietary + partner data) | LSTM discharge forecast on CWC + Open-Meteo; U-Net flood extent on Sentinel-1; official bulletin validation as additional input |
 | Cyclone | Live data integration | IMD cyclone bulletins; ECMWF / Open-Meteo wind fields; no proprietary model in v1 |
 | Wildfire | Live data integration | NASA FIRMS VIIRS/MODIS active fire detections; no proprietary prediction in v1 |
 | Landslide | Static + rule-based | GSI India landslide hazard zonation overlay; rainfall threshold rules from published literature |
@@ -100,9 +100,9 @@ This table is the source of truth. Update it as components ship.
 ┌─────────────── DATA INGESTION LAYER ─────────────────────┐
 │  USGS earthquake feed          (every 60 s)              │
 │  IRIS FDSN waveforms           (on-demand via ObsPy)     │
-│  Google Flood Hub API          (every 15 min)            │
-│  CWC India river gauges        (every 30 min, scraped)   │
-│  IMD rainfall + cyclone        (every 30 min, RSS+page)  │
+│  CWC India river gauges        (every 30 min, HTML)      │
+│  Official flood bulletins      (configured URLs)         │
+│  IMD/RSMC + JTWC cyclone       (every 30 min, HTML/text) │
 │  NASA FIRMS active fires       (every 60 min)            │
 │  Open-Meteo weather            (on-demand per region)    │
 │  User SOS form                 (event-driven)            │
@@ -114,7 +114,7 @@ This table is the source of truth. Update it as components ship.
                             ↓
 ┌─────────────────── PROCESSING LAYER ─────────────────────┐
 │  Earthquake: LSTM autoencoder anomaly + Omori aftershock │
-│  Flood:      LSTM discharge + U-Net extent + GFH fusion  │
+│  Flood:      LSTM discharge + U-Net extent + bulletins   │
 │  Cyclone:    Track extrapolation + impact estimation     │
 │  Wildfire:   FIRMS clustering + risk classification      │
 │  Landslide:  Rainfall threshold rules + GSI overlay      │
@@ -216,8 +216,8 @@ Every source is free for non-commercial use. Commercial licensing must be revisi
 - **IRIS FDSN web services** — raw waveforms via ObsPy. Used for autoencoder training and historical analysis. Fair use only.
 
 ### 5.2 Floods
-- **Google Flood Hub API** — riverine forecasts for India (7-day lead). Requires sign-up. Verify terms of service before any commercial use.
 - **CWC (Central Water Commission)** — river gauge readings. Public website; respect robots and rate. Obtain MoU before commercial deployment.
+- **Official state flood bulletins** — optional configured sources; only geotagged, validated bulletins are stored.
 - **Open-Meteo** — precipitation forecasts, no key, no rate limit.
 - **Sentinel-1 SAR** (via Copernicus Open Access Hub or Sentinel Hub free tier) — for U-Net flood extent. 30,000 free processing units per month on Sentinel Hub.
 
@@ -274,7 +274,7 @@ Every source is free for non-commercial use. Commercial licensing must be revisi
 - **Training data:** Per the Enipeas Basin paper methodology — synthetic flood extents from HEC-RAS 2D as ground truth, plus real Sentinel-1 captures during the 2018 Kerala flood and 2023 Sikkim flash flood for validation.
 - **Output:** Per-pixel flood probability mask.
 
-**Fusion:** Google Flood Hub forecasts are pulled and displayed alongside Alertix forecasts; if both agree on a high-risk basin, the alert severity is upgraded.
+**Validation:** CWC readings and official flood bulletins are stored with provenance. If future partner feeds are added, they must be documented and validated before they can affect severity.
 
 ### 6.3 Cyclone — Track Extrapolation
 
@@ -361,7 +361,7 @@ CREATE TABLE profiles (
 CREATE TABLE events (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     hazard_type     TEXT NOT NULL,    -- earthquake|flood|cyclone|wildfire|landslide|damage
-    source          TEXT NOT NULL,    -- usgs|iris|imd|firms|google_flood_hub|cwc|user
+    source          TEXT NOT NULL,    -- usgs|iris|imd_rsmc|jtwc|nasa_firms|cwc|open_meteo|user
     external_id     TEXT,
     occurred_at     TIMESTAMPTZ NOT NULL,
     location        GEOGRAPHY(POINT, 4326),
@@ -490,7 +490,9 @@ All routes return JSON. Authentication via Supabase JWT in `Authorization: Beare
 - `POST /internal/ingest/firms`
 - `POST /internal/ingest/imd`
 - `POST /internal/ingest/cwc`
-- `POST /internal/ingest/google_flood_hub`
+- `POST /internal/ingest/flood`
+- `POST /internal/ingest/weather`
+- `POST /internal/ingest/cyclones`
 
 ### 9.7 LLM (internal)
 - `POST /internal/llm/explain` — payload: `event_id`, `lang`. Returns explanation, writes back to events/alerts table.
@@ -711,7 +713,7 @@ Tasks:
 
 #### Day 15: Flood data pipeline
 
-- Google Flood Hub API integration.
+- CWC and configured official flood bulletin integration.
 - CWC scraper for 5 starter basins (Krishna, Godavari, Mahanadi, Yamuna, Brahmaputra). Use BeautifulSoup, respect robots.
 - Open-Meteo rainfall integration.
 - All flood events into `events` table.
@@ -860,10 +862,11 @@ alertix-ai/
 │   │   ├── ingestion/
 │   │   │   ├── usgs.py
 │   │   │   ├── iris.py
-│   │   │   ├── google_flood_hub.py
-│   │   │   ├── cwc.py
-│   │   │   ├── imd_cyclone.py
-│   │   │   ├── nasa_firms.py
+│   │   │   ├── earthquake/
+│   │   │   ├── flood/
+│   │   │   ├── cyclone/
+│   │   │   ├── wildfire/
+│   │   │   ├── weather/
 │   │   │   └── open_meteo.py
 │   │   ├── ml/
 │   │   │   ├── seismic_autoencoder.py
@@ -1001,7 +1004,7 @@ Real things that will go wrong. Mitigations included.
 | Local PC off → LLM unavailable | High | Groq fallback (already in design) |
 | Groq rate-limited | Medium | Gemini Flash fallback (already in design) |
 | Cloudflare Tunnel URL changes | Medium | Use named tunnel with stable hostname |
-| CWC scraping blocked | Medium | Cache last good values; fall back to Google Flood Hub |
+| CWC scraping blocked | Medium | Cache last good values; alert operators and use configured official bulletins only |
 | GitHub Actions cron drift | Low | Add health-check endpoint that reports last-ingest age |
 | Three.js earth crashes mobile Safari | Medium | Serve a static fallback hero image to mobile detection |
 | Sentinel Hub processing units exhausted | Medium | Cache extent results aggressively; serve preview only on flood tab |

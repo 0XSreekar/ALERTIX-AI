@@ -2,8 +2,9 @@
 
 import pytest
 from pydantic import ValidationError
-from app.schemas.sos import SosCreate
+
 from app.schemas.contact import ContactForm
+from app.schemas.sos import SosCreate
 
 
 class TestSosCreate:
@@ -27,7 +28,9 @@ class TestSosCreate:
 
 class TestContactForm:
     def test_valid_contact(self):
-        form = ContactForm(name="Test User", email="test@example.com", message="Hello, this is a test message")
+        form = ContactForm(
+            name="Test User", email="test@example.com", message="Hello, this is a test message"
+        )
         assert form.name == "Test User"
 
     def test_empty_name(self):

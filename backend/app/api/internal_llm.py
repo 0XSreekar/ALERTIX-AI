@@ -1,4 +1,5 @@
-﻿"""Internal LLM endpoints — cron-token protected."""
+"""Internal LLM endpoints — cron-token protected."""
+
 from __future__ import annotations
 
 import json
@@ -72,11 +73,10 @@ async def triage_sos(
         data = json.loads(raw)
     except json.JSONDecodeError as exc:
         import re
+
         match = re.search(r"\{.*\}", raw, re.DOTALL)
         if not match:
-            raise HTTPException(
-                status_code=502, detail="LLM returned invalid JSON"
-            ) from exc
+            raise HTTPException(status_code=502, detail="LLM returned invalid JSON") from exc
         data = json.loads(match.group(0))
     return TriageResponse(**data, provider=provider)
 
@@ -84,6 +84,7 @@ async def triage_sos(
 @router.get("/health")
 async def llm_health() -> dict:
     from app.llm.ollama_client import OllamaClient
+
     ollama_up = await OllamaClient().health()
     return {
         "ollama": ollama_up,

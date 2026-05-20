@@ -11,7 +11,7 @@ BASE_URL = "https://api.open-meteo.com/v1/forecast"
 
 async def get_rainfall_forecast(lat: float, lon: float, hours: int = 72) -> dict:
     """Fetch hourly precipitation forecast for a point. Returns raw API response."""
-    params = {
+    params: dict[str, str | int | float] = {
         "latitude": lat,
         "longitude": lon,
         "hourly": "precipitation,temperature_2m,relative_humidity_2m,wind_speed_10m",
@@ -26,7 +26,7 @@ async def get_rainfall_forecast(lat: float, lon: float, hours: int = 72) -> dict
 
 async def get_rainfall_history(lat: float, lon: float, start_date: str, end_date: str) -> dict:
     """Fetch historical hourly rainfall. Dates as 'YYYY-MM-DD'."""
-    params = {
+    params: dict[str, str | int | float] = {
         "latitude": lat,
         "longitude": lon,
         "hourly": "precipitation",
@@ -43,7 +43,7 @@ async def get_rainfall_history(lat: float, lon: float, start_date: str, end_date
 
 async def get_wind_data(lat: float, lon: float) -> dict:
     """Fetch current wind fields for cyclone tab."""
-    params = {
+    params: dict[str, str | int | float] = {
         "latitude": lat,
         "longitude": lon,
         "hourly": "wind_speed_10m,wind_direction_10m,pressure_msl",

@@ -1,6 +1,6 @@
 """Tests for auth dependencies."""
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import jwt
 import pytest
@@ -40,8 +40,8 @@ def _make_token(claims: dict | None = None) -> str:
         "sub": "user-123",
         "email": "test@example.com",
         "role": "citizen",
-        "exp": datetime.now(timezone.utc) + timedelta(hours=1),
-        "iat": datetime.now(timezone.utc),
+        "exp": datetime.now(UTC) + timedelta(hours=1),
+        "iat": datetime.now(UTC),
         **(claims or {}),
     }
     return jwt.encode(payload, _jwt_secret(), algorithm="HS256")
@@ -59,7 +59,7 @@ class TestDecodeJWT:
         token = jwt.encode(
             {
                 "sub": "x",
-                "exp": datetime.now(timezone.utc) - timedelta(hours=1),
+                "exp": datetime.now(UTC) - timedelta(hours=1),
             },
             _jwt_secret(),
             algorithm="HS256",

@@ -1,13 +1,15 @@
-﻿"""Seismic LSTM autoencoder -- inference wrapper.
+"""Seismic LSTM autoencoder -- inference wrapper.
 
 Training happens in ml/notebooks/seismic_autoencoder.ipynb.
 This module loads the trained weights from R2 and scores new events.
 If weights are not available it returns a sentinel score of -1.0.
 """
+
 from __future__ import annotations
 
 import logging
 from pathlib import Path
+from typing import Any, cast
 
 import numpy as np
 
@@ -29,6 +31,7 @@ def _try_load_model() -> object | None:
         import torch
 
         from app.ml.seismic_model import SeismicAutoencoder
+
         model = SeismicAutoencoder()
         model.load_state_dict(torch.load(_WEIGHTS_PATH, map_location="cpu"))
         model.eval()
@@ -42,11 +45,12 @@ def _try_load_model() -> object | None:
 
 def score_event(features: list[float]) -> float:
     """Return reconstruction error (anomaly score). -1.0 = model unavailable."""
-    model = _try_load_model()
+    model = cast(Any, _try_load_model())
     if model is None:
         return -1.0
     try:
         import torch
+
         x = torch.tensor([features], dtype=torch.float32)
         with torch.no_grad():
             recon = model(x)

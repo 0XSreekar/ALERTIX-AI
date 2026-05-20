@@ -8,6 +8,7 @@ import type {
   WildfirePrediction,
 } from "./types";
 import { getToken } from "./localAuth";
+import { cacheAlerts, queueCitizenReport } from "./offline";
 
 const BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
 
@@ -45,7 +46,10 @@ export function fetchEvent(id: string) {
 // ── Alerts ──────────────────────────────────────────────────
 export function fetchAlerts(params?: Record<string, string>) {
   const qs = params ? "?" + new URLSearchParams(params).toString() : "";
-  return apiFetch<{ alerts: Alert[] }>(`/api/alerts${qs}`);
+  return apiFetch<{ alerts: Alert[] }>(`/api/alerts${qs}`).then((data) => {
+    cacheAlerts(data.alerts);
+    return data;
+  });
 }
 
 export function fetchAlert(id: string) {
@@ -110,5 +114,23 @@ export function uploadDamageImage(file: File) {
   return apiFetch<{ status: string; classes: Record<string, number> }>("/api/damage/segment", {
     method: "POST",
     body: form,
+  });
+}
+
+export async function submitCitizenReport(body: {
+  hazard_type: string;
+  description: string;
+  latitude: number;
+  longitude: number;
+  media_url?: string | null;
+}) {
+  if (!navigator.onLine) {
+    queueCitizenReport(body);
+    return { status: "queued-offline" };
+  }
+  return apiFetch<{ id: string; status: string }>("/report", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
   });
 }

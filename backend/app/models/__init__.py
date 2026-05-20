@@ -1,5 +1,6 @@
 from app.models.alert import Alert
 from app.models.audit_log import AuditLog
+from app.models.citizen import CitizenReport, DamageResult, Upload, UserReputation
 from app.models.event import Event
 from app.models.model_version import ModelVersion
 from app.models.profile import Profile
@@ -14,4 +15,8 @@ __all__ = [
     "Region",
     "AuditLog",
     "ModelVersion",
+    "CitizenReport",
+    "UserReputation",
+    "Upload",
+    "DamageResult",
 ]

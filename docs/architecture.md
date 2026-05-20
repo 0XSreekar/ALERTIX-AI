@@ -6,7 +6,7 @@ See Section 3 of `ALERTIX_AI_DOCUMENTATION.md` for the full architecture diagram
 
 Three-layer architecture:
 
-1. **Ingestion Layer** — pulls from USGS, IRIS, IMD, NASA FIRMS, Google Flood Hub, CWC, Open-Meteo. Normalizes to a common Event schema. Writes to Postgres + pushes to Redis stream `hazard:events`.
+1. **Ingestion Layer** — pulls from USGS, IRIS, IMD/RSMC, JTWC, NASA FIRMS, CWC, configured official flood bulletins, and Open-Meteo. Normalizes to a common Event schema. Writes to Postgres + pushes to Redis stream `hazard:events`.
 
 2. **Processing Layer** — consumes from Redis stream. Runs hazard-specific models (Phase 2). Creates Alerts when severity thresholds are crossed. Publishes to Redis pub/sub `alerts:new`.
 

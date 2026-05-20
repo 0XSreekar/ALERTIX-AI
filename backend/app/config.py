@@ -31,9 +31,12 @@ class Settings(BaseSettings):
 
     # External APIs
     nasa_firms_map_key: str = ""
-    google_flood_hub_key: str = ""
     sentinel_hub_client_id: str = ""
     sentinel_hub_client_secret: str = ""
+    cwc_flood_dashboard_url: str = "https://cwc.gov.in/ffm_dashboard"
+    cwc_daily_report_url: str = "https://cwc.gov.in/fmo/dfsra"
+    state_flood_bulletin_urls: str = ""
+    weather_ingest_points: str = ""
 
     # R2
     r2_account_id: str = ""
@@ -41,6 +44,11 @@ class Settings(BaseSettings):
     r2_secret_access_key: str = ""
     r2_bucket: str = "alertix"
     r2_public_url: str = ""
+    storage_backend: str = "local"
+    local_upload_dir: str = "uploads"
+    damage_model_checkpoint: str = ""
+    flood_lstm_checkpoint: str = ""
+    flood_unet_checkpoint: str = ""
 
     # LLM (Phase 2)
     ollama_url: str = "http://localhost:11434"
@@ -58,6 +66,23 @@ class Settings(BaseSettings):
     @property
     def cors_origins_list(self) -> list[str]:
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
+
+    @property
+    def state_flood_bulletin_url_list(self) -> list[str]:
+        return [url.strip() for url in self.state_flood_bulletin_urls.split(",") if url.strip()]
+
+    @property
+    def weather_ingest_point_list(self) -> list[tuple[float, float]]:
+        points: list[tuple[float, float]] = []
+        for raw_point in self.weather_ingest_points.split(";"):
+            if not raw_point.strip():
+                continue
+            try:
+                lat, lon = [float(part.strip()) for part in raw_point.split(",", maxsplit=1)]
+            except ValueError:
+                continue
+            points.append((lat, lon))
+        return points
 
     @property
     def is_production(self) -> bool:
