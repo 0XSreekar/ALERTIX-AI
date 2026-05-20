@@ -6,7 +6,7 @@ from app.config import settings
 
 class GroqClient:
     BASE_URL = "https://api.groq.com/openai/v1/chat/completions"
-    MODEL = "llama-3.1-70b-versatile"
+    MODEL = "llama-3.3-70b-versatile"
 
     async def generate(self, prompt: str) -> str:
         if not settings.GROQ_API_KEY:
