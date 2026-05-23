@@ -13,6 +13,7 @@ from app.ingestion.common.logger import (
     log_duplicate_payload,
     log_ingestion_summary,
 )
+from app.ingestion.metrics import metrics as ingest_metrics
 from app.ingestion.common.storage import bulk_upsert_hazard_events, bulk_upsert_legacy_events
 from app.ingestion.common.stream import publish_hazard_events
 from app.ingestion.cyclone.client import fetch_imd_bulletins, fetch_jtwc_bulletins
@@ -129,6 +130,16 @@ async def ingest_cyclones(session: AsyncSession) -> dict:
         "streamed": published,
         "dropped_malformed_or_outside_basin": len(parsed) - len(valid),
     }
+    ingest_metrics.record(
+        "cyclone",
+        fetched=len(parsed),
+        parsed=len(parsed),
+        valid=len(valid),
+        malformed=len(parsed) - len(valid),
+        duplicates=duplicates,
+        stored=len(stored_refs),
+        streamed=published,
+    )
     log_duplicate_payload(log, "cyclone", duplicates)
     log_ingestion_summary(log, "cyclone", **stats)
     return stats

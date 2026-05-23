@@ -15,6 +15,7 @@ from app.ingestion.common.logger import (
     log_duplicate_payload,
     log_ingestion_summary,
 )
+from app.ingestion.metrics import metrics as ingest_metrics
 from app.ingestion.common.storage import bulk_upsert_hazard_events, bulk_upsert_legacy_events
 from app.ingestion.common.stream import publish_hazard_events
 from app.ingestion.wildfire.client import FIRMS_SOURCES, fetch_firms_csv
@@ -145,6 +146,16 @@ async def ingest_firms(session: AsyncSession, *, day_range: int = 1, batch_size:
         "streamed": streamed_total,
         "malformed_or_outside_india": len(all_events) - len(valid),
     }
+    ingest_metrics.record(
+        "nasa_firms",
+        fetched=fetched_sources,
+        parsed=len(all_events),
+        valid=len(valid),
+        malformed=len(all_events) - len(valid),
+        duplicates=duplicates,
+        stored=stored_total,
+        streamed=streamed_total,
+    )
     log_duplicate_payload(log, "nasa_firms", duplicates)
     log_ingestion_summary(log, "nasa_firms", **stats)
     return stats

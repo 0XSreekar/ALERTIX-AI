@@ -13,6 +13,7 @@ from app.ingestion.common.logger import (
     log_duplicate_payload,
     log_ingestion_summary,
 )
+from app.ingestion.metrics import metrics as ingest_metrics
 from app.ingestion.common.storage import bulk_upsert_hazard_events, bulk_upsert_legacy_events
 from app.ingestion.common.stream import publish_hazard_events
 from app.ingestion.earthquake.client import fetch_usgs_geojson
@@ -108,6 +109,16 @@ async def ingest_usgs(session: AsyncSession, feed: str = "all_hour") -> dict:
         "streamed": published,
         "malformed": len(parsed) - len(valid),
     }
+    ingest_metrics.record(
+        "usgs",
+        fetched=len(payload.get("features") or []),
+        parsed=len(parsed),
+        valid=len(valid),
+        malformed=len(parsed) - len(valid),
+        duplicates=duplicates,
+        stored=len(stored_refs),
+        streamed=published,
+    )
     log_duplicate_payload(log, "usgs", duplicates)
     log_ingestion_summary(log, "usgs", **stats)
     return stats

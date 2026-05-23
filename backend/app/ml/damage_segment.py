@@ -117,7 +117,16 @@ class DamageSegmenter:
         self.torch.save({"state_dict": self.model.state_dict(), "metrics": self.metrics}, path)
 
     def load(self, path: str | Path) -> None:
-        checkpoint = self.torch.load(Path(path), map_location="cpu")
+        path = Path(path)
+        from app.config import get_settings
+
+        settings = get_settings()
+        if not path.exists():
+            if settings.require_model_weights:
+                raise RuntimeError(f"DamageSegmenter checkpoint not found: {path}")
+            log.info("damage_segment_checkpoint_missing, continuing without weights: %s", path)
+            return
+        checkpoint = self.torch.load(path, map_location="cpu")
         self.model.load_state_dict(checkpoint["state_dict"])
         self.metrics = dict(checkpoint.get("metrics") or {})
         self.model.eval()

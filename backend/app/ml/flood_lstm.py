@@ -104,7 +104,16 @@ class FloodLSTM:
         path.with_suffix(path.suffix + ".json").write_text(json.dumps(self.metrics), encoding="utf-8")
 
     def load(self, path: str | Path) -> None:
-        checkpoint = self.torch.load(Path(path), map_location="cpu")
+        path = Path(path)
+        from app.config import get_settings
+
+        settings = get_settings()
+        if not path.exists():
+            if settings.require_model_weights:
+                raise RuntimeError(f"FloodLSTM checkpoint not found: {path}")
+            log.info("flood_lstm_checkpoint_missing, continuing without weights: %s", path)
+            return
+        checkpoint = self.torch.load(path, map_location="cpu")
         self.model.load_state_dict(checkpoint["state_dict"])
         self.metrics = dict(checkpoint.get("metrics") or {})
         self.model.eval()

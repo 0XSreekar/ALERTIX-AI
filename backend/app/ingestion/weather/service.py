@@ -14,6 +14,7 @@ from app.ingestion.common.logger import (
     log_duplicate_payload,
     log_ingestion_summary,
 )
+from app.ingestion.metrics import metrics as ingest_metrics
 from app.ingestion.common.storage import bulk_upsert_hazard_events
 from app.ingestion.common.stream import publish_hazard_events
 from app.ingestion.weather.client import fetch_open_meteo_rainfall
@@ -109,6 +110,15 @@ async def ingest_weather(session: AsyncSession) -> dict:
         "weather_rows": weather_rows,
         "streamed": published,
     }
+    ingest_metrics.record(
+        "open_meteo",
+        fetched=len(points),
+        parsed=len(parsed),
+        valid=len(valid),
+        duplicates=duplicates,
+        stored=len(stored_refs),
+        streamed=published,
+    )
     log_duplicate_payload(log, "weather", duplicates)
     log_ingestion_summary(log, "weather", **stats)
     return stats

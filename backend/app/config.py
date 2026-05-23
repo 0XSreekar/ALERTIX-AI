@@ -1,5 +1,5 @@
 from functools import lru_cache
-from typing import Literal
+from typing import Literal, Optional
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -12,11 +12,28 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
+    # Environment
     app_env: Literal["development", "staging", "production"] = "development"
     log_level: str = "INFO"
 
+    # Database settings
     database_url: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/alertix"
     database_url_sync: str = "postgresql+psycopg2://postgres:postgres@localhost:5432/alertix"
+    db_max_connections: int = 20
+    db_pool_min_size: int = 1
+    db_read_replica_url: Optional[str] = None
+
+    # Model & ML settings
+    model_weights_dir: str = "./models"
+    require_model_weights: bool = False
+
+    # AI guardrails and behavior
+    enable_ai_guardrails: bool = True
+    ai_summary_max_tokens: int = 1024
+
+    # Redis / ingestion resilience
+    redis_retry_attempts: int = 5
+    redis_retry_backoff_ms: int = 200
 
     redis_url: str = "redis://localhost:6379/0"
 

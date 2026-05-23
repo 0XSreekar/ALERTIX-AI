@@ -97,6 +97,13 @@ The cron workflows will start running automatically:
 - **Sentry**: Add `SENTRY_DSN_BACKEND` to Render env vars. Add `VITE_SENTRY_DSN` to Cloudflare Pages env vars.
 - **Grafana Cloud**: Set up a free account, configure Prometheus endpoint on the backend (add in Phase 2).
 
+## Model weights, AI guardrails and metrics
+
+- Provision model checkpoints (S3/R2) into the backend `models/` directory or configure an object-storage sync. The backend reads `model_weights_dir` from settings and will load checkpoints when present. Set `require_model_weights=true` in `.env` to fail fast if checkpoints are missing.
+- AI guardrails are enabled by default (`enable_ai_guardrails=true`). To change behavior, toggle this env var. Guardrails block requests that ask for exact predictions or official evacuation orders.
+- Ingestion metrics are exposed at `GET /api/ingest/metrics` and a health snapshot at `GET /api/ingest/health`. Processing metrics remain at `GET /api/processing/metrics`.
+
+
 ## Troubleshooting
 
 | Issue | Fix |

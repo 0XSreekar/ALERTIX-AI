@@ -79,6 +79,7 @@ app.include_router(predict_router)
 app.include_router(damage_router)
 app.include_router(contact_router)
 app.include_router(processing_router)
+app.include_router(__import__("app.api.ingestion", fromlist=["router"]).router)
 app.include_router(citizen_reports_router)
 
 # ── Internal routers ───────────────────────────────────────────
