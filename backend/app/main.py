@@ -15,6 +15,7 @@ from app import __version__
 from app.config import get_settings
 from app.logging import configure_logging, get_logger
 from app.redis_client import close_redis
+from app.tasks.scheduler import start_scheduler, stop_scheduler
 
 settings = get_settings()
 log = get_logger(__name__)
@@ -25,6 +26,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     configure_logging()
     log.info("alertix_starting", version=__version__, env=settings.app_env)
 
+    # Validate JWT secret is properly configured before accepting traffic
+    settings.validate_jwt_secret()
+
     if settings.sentry_dsn_backend:
         sentry_sdk.init(
             dsn=settings.sentry_dsn_backend,
@@ -32,8 +36,11 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             environment=settings.app_env,
         )
 
+    start_scheduler()
+
     yield
 
+    stop_scheduler()
     await close_redis()
     log.info("alertix_shutdown")
 
@@ -52,10 +59,14 @@ app = FastAPI(
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, cast(Any, _rate_limit_exceeded_handler))
 
+_cors_origins = settings.cors_origins_list
+# credentials=True is incompatible with wildcard origins per the CORS spec
+_allow_credentials = "*" not in _cors_origins
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.cors_origins_list,
-    allow_credentials=True,
+    allow_origins=_cors_origins,
+    allow_credentials=_allow_credentials,
     allow_methods=["*"],
     allow_headers=["*"],
 )

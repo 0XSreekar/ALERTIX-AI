@@ -1,17 +1,36 @@
 """WebSocket endpoints — /ws/alerts and /ws/events.
 
 Subscribes to Redis pub/sub channels and fans out to connected clients.
+JWT token required as query parameter: ?token=<jwt>
 """
 
 import asyncio
 
+import jwt as pyjwt
 from fastapi import APIRouter, Query, WebSocket, WebSocketDisconnect
 
+from app.config import get_jwt_secret
 from app.logging import get_logger
 from app.redis_client import get_redis
 
 log = get_logger(__name__)
 router = APIRouter(tags=["websocket"])
+
+_WS_CLOSE_POLICY_VIOLATION = 1008
+
+
+def _verify_ws_token(token: str | None) -> dict | None:
+    """Decode and verify a JWT for WebSocket connections.
+
+    Returns the payload dict on success, or None if the token is missing/invalid.
+    """
+    if not token:
+        return None
+    try:
+        secret = get_jwt_secret()
+        return pyjwt.decode(token, secret, algorithms=["HS256"])
+    except pyjwt.PyJWTError:
+        return None
 
 
 class ConnectionManager:
@@ -63,7 +82,16 @@ def _ensure_pubsub(channel: str):
 
 
 @router.websocket("/ws/alerts")
-async def ws_alerts(ws: WebSocket):
+async def ws_alerts(ws: WebSocket, token: str | None = Query(default=None)):
+    payload = _verify_ws_token(token)
+    if payload is None:
+        await ws.close(code=_WS_CLOSE_POLICY_VIOLATION, reason="Missing or invalid JWT token")
+        return
+
+    user_id: str = payload.get("sub", "")
+    role: str = payload.get("role", "citizen")
+    log.info("ws_alerts_auth", user_id=user_id, role=role)
+
     channel = "alerts:new"
     _ensure_pubsub(channel)
     await manager.connect(channel, ws)
@@ -78,7 +106,20 @@ async def ws_alerts(ws: WebSocket):
 
 
 @router.websocket("/ws/events")
-async def ws_events(ws: WebSocket, hazard_type: str = Query("earthquake")):
+async def ws_events(
+    ws: WebSocket,
+    hazard_type: str = Query("earthquake"),
+    token: str | None = Query(default=None),
+):
+    payload = _verify_ws_token(token)
+    if payload is None:
+        await ws.close(code=_WS_CLOSE_POLICY_VIOLATION, reason="Missing or invalid JWT token")
+        return
+
+    user_id: str = payload.get("sub", "")
+    role: str = payload.get("role", "citizen")
+    log.info("ws_events_auth", user_id=user_id, role=role, hazard_type=hazard_type)
+
     channel = f"events:{hazard_type}"
     _ensure_pubsub(channel)
     await manager.connect(channel, ws)

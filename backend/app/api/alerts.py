@@ -53,6 +53,13 @@ async def list_alerts(
 
     where = "WHERE " + " AND ".join(conditions) if conditions else ""
 
+    count_params = {k: v for k, v in params.items() if k not in ("limit", "offset")}
+    count_result = await session.execute(
+        text(f"SELECT COUNT(*) FROM alerts {where}"),
+        count_params,
+    )
+    total: int = count_result.scalar() or 0
+
     result = await session.execute(
         text(f"""
             SELECT id, hazard_type, severity, title, explanation,
@@ -65,7 +72,7 @@ async def list_alerts(
         params,
     )
     rows = result.fetchall()
-    return {"alerts": [_row_to_dict(r) for r in rows], "limit": limit, "offset": offset}
+    return {"alerts": [_row_to_dict(r) for r in rows], "total": total, "limit": limit, "offset": offset}
 
 
 @router.get("/region")
@@ -73,8 +80,24 @@ async def alerts_by_region(
     lat: float = Query(...),
     lon: float = Query(...),
     radius_km: float = Query(50, ge=1, le=500),
+    limit: int = Query(50, ge=1, le=500),
+    offset: int = Query(0, ge=0),
     session: AsyncSession = Depends(get_session),
 ) -> dict:
+    count_result = await session.execute(
+        text("""
+            SELECT COUNT(*) FROM alerts
+            WHERE (expires_at IS NULL OR expires_at > :now)
+              AND ST_DWithin(
+                  region,
+                  ST_SetSRID(ST_MakePoint(:lon, :lat), 4326)::geography,
+                  :radius_m
+              )
+        """),
+        {"lat": lat, "lon": lon, "radius_m": radius_km * 1000, "now": datetime.now(UTC)},
+    )
+    total: int = count_result.scalar() or 0
+
     result = await session.execute(
         text("""
             SELECT id, hazard_type, severity, title, explanation,
@@ -88,17 +111,19 @@ async def alerts_by_region(
                   :radius_m
               )
             ORDER BY created_at DESC
-            LIMIT 50
+            LIMIT :limit OFFSET :offset
         """),
         {
             "lat": lat,
             "lon": lon,
             "radius_m": radius_km * 1000,
             "now": datetime.now(UTC),
+            "limit": limit,
+            "offset": offset,
         },
     )
     rows = result.fetchall()
-    return {"alerts": [_row_to_dict(r) for r in rows]}
+    return {"alerts": [_row_to_dict(r) for r in rows], "total": total, "limit": limit, "offset": offset}
 
 
 @router.get("/{alert_id}")

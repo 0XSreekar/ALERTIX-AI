@@ -1,7 +1,10 @@
+import os
 from functools import lru_cache
 from typing import Literal, Optional
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+_DEV_JWT_SECRET = "local-dev-secret-change-in-prod"
 
 
 class Settings(BaseSettings):
@@ -105,7 +108,35 @@ class Settings(BaseSettings):
     def is_production(self) -> bool:
         return self.app_env == "production"
 
+    def validate_jwt_secret(self) -> None:
+        """Raise RuntimeError if JWT secret is unsafe in non-development environments."""
+        secret = self.supabase_jwt_secret
+        is_dev = self.app_env == "development" or os.getenv("ENVIRONMENT", "").lower() == "development"
+        if not is_dev:
+            if not secret or secret == _DEV_JWT_SECRET:
+                raise RuntimeError(
+                    "SUPABASE_JWT_SECRET must be set to a secure random string in "
+                    f"non-development environments (app_env={self.app_env!r}). "
+                    "Set ENVIRONMENT=development to bypass this check only in local dev."
+                )
+
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
     return Settings()
+
+
+def get_jwt_secret() -> str:
+    """Return the JWT secret, falling back to dev default only in development mode."""
+    settings = get_settings()
+    if settings.supabase_jwt_secret:
+        return settings.supabase_jwt_secret
+    is_dev = (
+        settings.app_env == "development"
+        or os.getenv("ENVIRONMENT", "").lower() == "development"
+    )
+    if not is_dev:
+        raise RuntimeError(
+            "SUPABASE_JWT_SECRET is not set. Cannot issue or verify JWTs in production."
+        )
+    return _DEV_JWT_SECRET

@@ -1,12 +1,20 @@
+import enum
 import uuid
 from datetime import datetime
 
 from geoalchemy2 import Geography
-from sqlalchemy import Boolean, Float, ForeignKey, Index, String, Text
+from sqlalchemy import Boolean, Enum, Float, ForeignKey, Index, String, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base
+
+
+class SosStatus(str, enum.Enum):
+    pending = "pending"
+    triaged = "triaged"
+    dispatched = "dispatched"
+    resolved = "resolved"
 
 
 class SosReport(Base):
@@ -20,6 +28,11 @@ class SosReport(Base):
     extracted_location_text: Mapped[str | None] = mapped_column(Text)
     urgency_score: Mapped[float | None] = mapped_column(Float)
     triaged: Mapped[bool] = mapped_column(Boolean, default=False)
+    status: Mapped[SosStatus] = mapped_column(
+        Enum(SosStatus, name="sos_status", create_constraint=True),
+        default=SosStatus.pending,
+        nullable=False,
+    )
     llm_summary: Mapped[str | None] = mapped_column(Text)
     related_event_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("events.id"), nullable=True
@@ -29,4 +42,5 @@ class SosReport(Base):
     __table_args__ = (
         Index("sos_location_idx", "location", postgresql_using="gist"),
         Index("sos_urgency_idx", "urgency_score"),
+        Index("sos_status_idx", "status"),
     )

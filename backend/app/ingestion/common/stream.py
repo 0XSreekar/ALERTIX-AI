@@ -54,6 +54,6 @@ async def publish_hazard_events(
         if published:
             await pipe.execute()
         return published
-    except Exception as exc:
-        log.warning("redis_stream_publish_failed", stream=HAZARD_EVENTS_STREAM, error=str(exc))
+    except Exception:
+        log.exception("redis_stream_publish_failed", stream=HAZARD_EVENTS_STREAM)
         return 0

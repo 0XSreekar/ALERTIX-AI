@@ -198,7 +198,7 @@ async def verify_report(session: AsyncSession, report_id: UUID, decision: str, a
         )
     await session.execute(
         text("""
-            INSERT INTO audit_log (actor_user_id, action, target_table, target_id, payload, created_at)
+            INSERT INTO audit_log (actor_user_id, action, entity_type, entity_id, details, created_at)
             VALUES (:actor_user_id, :action, 'citizen_reports', :report_id, '{}'::jsonb, now())
         """),
         {"actor_user_id": actor.user_id, "action": f"report_{decision}", "report_id": report_id},
