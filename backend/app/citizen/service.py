@@ -51,7 +51,9 @@ def extract_entities(description: str, hazard_type: str) -> dict:
     return {"hazards": hazards, "places": places}
 
 
-def score_report(report: CitizenReportCreate, entities: dict, user_tier: str, duplicate: bool) -> float:
+def score_report(
+    report: CitizenReportCreate, entities: dict, user_tier: str, duplicate: bool
+) -> float:
     score = 0.35
     if report.hazard_type.lower() in entities.get("hazards", []):
         score += 0.25
@@ -114,14 +116,22 @@ async def has_duplicate_report(session: AsyncSession, report: CitizenReportCreat
               )
             LIMIT 1
         """),
-        {"hazard_type": report.hazard_type.lower(), "lat": report.latitude, "lon": report.longitude},
+        {
+            "hazard_type": report.hazard_type.lower(),
+            "lat": report.latitude,
+            "lon": report.longitude,
+        },
     )
     return result.fetchone() is not None
 
 
-async def create_report(session: AsyncSession, report: CitizenReportCreate, user: CurrentUser | None) -> dict:
+async def create_report(
+    session: AsyncSession, report: CitizenReportCreate, user: CurrentUser | None
+) -> dict:
     user_id = user.user_id if user else None
-    reputation = await get_reputation(session, user_id) if user_id else Reputation(35, "flagged", 0, 0)
+    reputation = (
+        await get_reputation(session, user_id) if user_id else Reputation(35, "flagged", 0, 0)
+    )
     duplicate = await has_duplicate_report(session, report)
     entities = extract_entities(report.description, report.hazard_type)
     confidence = score_report(report, entities, reputation.tier, duplicate)
@@ -164,7 +174,9 @@ async def create_report(session: AsyncSession, report: CitizenReportCreate, user
     }
 
 
-async def verify_report(session: AsyncSession, report_id: UUID, decision: str, actor: CurrentUser) -> None:
+async def verify_report(
+    session: AsyncSession, report_id: UUID, decision: str, actor: CurrentUser
+) -> None:
     report = (
         await session.execute(
             text("SELECT user_id FROM citizen_reports WHERE id = :report_id"),
@@ -174,7 +186,9 @@ async def verify_report(session: AsyncSession, report_id: UUID, decision: str, a
     if not report:
         raise LookupError("report not found")
     await session.execute(
-        text("UPDATE citizen_reports SET status = :decision, updated_at = now() WHERE id = :report_id"),
+        text(
+            "UPDATE citizen_reports SET status = :decision, updated_at = now() WHERE id = :report_id"
+        ),
         {"decision": decision, "report_id": report_id},
     )
     if report.user_id:

@@ -1,6 +1,6 @@
 import os
 from functools import lru_cache
-from typing import Literal, Optional
+from typing import Literal
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -24,7 +24,7 @@ class Settings(BaseSettings):
     database_url_sync: str = "postgresql+psycopg2://postgres:postgres@localhost:5432/alertix"
     db_max_connections: int = 20
     db_pool_min_size: int = 1
-    db_read_replica_url: Optional[str] = None
+    db_read_replica_url: str | None = None
 
     # Model & ML settings
     model_weights_dir: str = "./models"
@@ -111,7 +111,9 @@ class Settings(BaseSettings):
     def validate_jwt_secret(self) -> None:
         """Raise RuntimeError if JWT secret is unsafe in non-development environments."""
         secret = self.supabase_jwt_secret
-        is_dev = self.app_env == "development" or os.getenv("ENVIRONMENT", "").lower() == "development"
+        is_dev = (
+            self.app_env == "development" or os.getenv("ENVIRONMENT", "").lower() == "development"
+        )
         if not is_dev:
             if not secret or secret == _DEV_JWT_SECRET:
                 raise RuntimeError(
@@ -132,8 +134,7 @@ def get_jwt_secret() -> str:
     if settings.supabase_jwt_secret:
         return settings.supabase_jwt_secret
     is_dev = (
-        settings.app_env == "development"
-        or os.getenv("ENVIRONMENT", "").lower() == "development"
+        settings.app_env == "development" or os.getenv("ENVIRONMENT", "").lower() == "development"
     )
     if not is_dev:
         raise RuntimeError(

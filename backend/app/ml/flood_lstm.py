@@ -34,13 +34,17 @@ class FloodForecast:
 
 
 class FloodLSTM:
-    def __init__(self, input_size: int = 2, hidden_size: int = 48, checkpoint: str | Path | None = None) -> None:
+    def __init__(
+        self, input_size: int = 2, hidden_size: int = 48, checkpoint: str | Path | None = None
+    ) -> None:
         torch, nn = _torch()
 
         class _Model(nn.Module):
             def __init__(self) -> None:
                 super().__init__()
-                self.lstm = nn.LSTM(input_size=input_size, hidden_size=hidden_size, batch_first=True)
+                self.lstm = nn.LSTM(
+                    input_size=input_size, hidden_size=hidden_size, batch_first=True
+                )
                 self.head = nn.Sequential(nn.Linear(hidden_size, 32), nn.ReLU(), nn.Linear(32, 3))
 
             def forward(self, x):  # type: ignore[no-untyped-def]
@@ -101,7 +105,9 @@ class FloodLSTM:
         path = Path(path)
         path.parent.mkdir(parents=True, exist_ok=True)
         self.torch.save({"state_dict": self.model.state_dict(), "metrics": self.metrics}, path)
-        path.with_suffix(path.suffix + ".json").write_text(json.dumps(self.metrics), encoding="utf-8")
+        path.with_suffix(path.suffix + ".json").write_text(
+            json.dumps(self.metrics), encoding="utf-8"
+        )
 
     def load(self, path: str | Path) -> None:
         path = Path(path)
@@ -127,7 +133,9 @@ class FloodLSTM:
             raise ValueError("seven_day_history must have shape (7, 2): rainfall_mm, river_level_m")
         started = time.perf_counter()
         with self.torch.no_grad():
-            pred = self.model(self.torch.tensor(history[None, :, :], dtype=self.torch.float32))[0].numpy()
+            pred = self.model(self.torch.tensor(history[None, :, :], dtype=self.torch.float32))[
+                0
+            ].numpy()
         latency_ms = (time.perf_counter() - started) * 1000.0
         max_forecast = float(np.max(pred))
         log.info("flood_lstm_inference", latency_ms=round(latency_ms, 3))

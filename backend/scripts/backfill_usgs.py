@@ -4,6 +4,7 @@ Usage: python -m scripts.backfill_usgs
 """
 
 import asyncio
+
 from app.db import AsyncSessionLocal
 from app.ingestion.usgs import ingest_usgs
 

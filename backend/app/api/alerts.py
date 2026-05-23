@@ -72,7 +72,12 @@ async def list_alerts(
         params,
     )
     rows = result.fetchall()
-    return {"alerts": [_row_to_dict(r) for r in rows], "total": total, "limit": limit, "offset": offset}
+    return {
+        "alerts": [_row_to_dict(r) for r in rows],
+        "total": total,
+        "limit": limit,
+        "offset": offset,
+    }
 
 
 @router.get("/region")
@@ -123,7 +128,12 @@ async def alerts_by_region(
         },
     )
     rows = result.fetchall()
-    return {"alerts": [_row_to_dict(r) for r in rows], "total": total, "limit": limit, "offset": offset}
+    return {
+        "alerts": [_row_to_dict(r) for r in rows],
+        "total": total,
+        "limit": limit,
+        "offset": offset,
+    }
 
 
 @router.get("/{alert_id}")

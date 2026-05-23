@@ -70,4 +70,8 @@ async def report_status(report_id: UUID, session: AsyncSession = Depends(get_ses
     ).fetchone()
     if not row:
         raise HTTPException(status_code=404, detail="Report not found")
-    return {"id": str(row.id), "status": row.status, "confidence_score": float(row.confidence_score)}
+    return {
+        "id": str(row.id),
+        "status": row.status,
+        "confidence_score": float(row.confidence_score),
+    }

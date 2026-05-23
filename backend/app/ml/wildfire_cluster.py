@@ -30,7 +30,9 @@ def _risk_level(size: int, avg_frp: float | None) -> str:
     return "low"
 
 
-def _normalize_hotspots(hotspots: list[dict] | list[tuple[float, float, float]]) -> list[dict[str, Any]]:
+def _normalize_hotspots(
+    hotspots: list[dict] | list[tuple[float, float, float]],
+) -> list[dict[str, Any]]:
     cleaned: list[dict[str, Any]] = []
     for item in hotspots:
         if isinstance(item, tuple):
@@ -78,7 +80,9 @@ def cluster_hotspots(
 
     clusters: list[dict] = []
     for label in sorted({int(lbl) for lbl in labels if lbl != -1}):
-        members = [cleaned[i] for i, member_label in enumerate(labels) if int(member_label) == label]
+        members = [
+            cleaned[i] for i, member_label in enumerate(labels) if int(member_label) == label
+        ]
         lats = [member["lat"] for member in members]
         lons = [member["lon"] for member in members]
         frps = [member["frp"] for member in members if member["frp"] is not None]

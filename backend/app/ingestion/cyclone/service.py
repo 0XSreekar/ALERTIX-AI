@@ -13,12 +13,12 @@ from app.ingestion.common.logger import (
     log_duplicate_payload,
     log_ingestion_summary,
 )
-from app.ingestion.metrics import metrics as ingest_metrics
 from app.ingestion.common.storage import bulk_upsert_hazard_events, bulk_upsert_legacy_events
 from app.ingestion.common.stream import publish_hazard_events
 from app.ingestion.cyclone.client import fetch_imd_bulletins, fetch_jtwc_bulletins
 from app.ingestion.cyclone.parser import CycloneParser, StormTracker
 from app.ingestion.cyclone.validator import validate_cyclone
+from app.ingestion.metrics import metrics as ingest_metrics
 
 log = get_ingestion_logger("cyclone")
 

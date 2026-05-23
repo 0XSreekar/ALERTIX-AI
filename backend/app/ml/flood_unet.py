@@ -84,7 +84,9 @@ class FloodUNet:
         f1 = (2 * tp) / max(2 * tp + fp + fn, 1.0)
         return {"iou": iou, "f1": f1}
 
-    def train_model(self, x: np.ndarray, y: np.ndarray, *, epochs: int = 10, lr: float = 1e-3) -> dict[str, float]:
+    def train_model(
+        self, x: np.ndarray, y: np.ndarray, *, epochs: int = 10, lr: float = 1e-3
+    ) -> dict[str, float]:
         torch = self.torch
         self.model.train()
         optimizer = torch.optim.Adam(self.model.parameters(), lr=lr)

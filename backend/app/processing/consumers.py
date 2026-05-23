@@ -55,7 +55,9 @@ class HazardConsumer:
     async def dedupe(self, event: ProcessingEvent) -> bool:
         if self.redis is None:
             return False
-        inserted = await self.redis.set(f"processing:dedupe:{event.dedupe_key}", "1", nx=True, ex=86400)
+        inserted = await self.redis.set(
+            f"processing:dedupe:{event.dedupe_key}", "1", nx=True, ex=86400
+        )
         return inserted is None
 
     async def persist_state(self, event: ProcessingEvent) -> None:
@@ -224,7 +226,9 @@ class HazardConsumer:
             raise RuntimeError("redis client required for stream consumer")
         last_id = "$"
         while True:
-            response: list[Any] = await self.redis.xread({HAZARD_EVENTS_STREAM: last_id}, count=25, block=block_ms)
+            response: list[Any] = await self.redis.xread(
+                {HAZARD_EVENTS_STREAM: last_id}, count=25, block=block_ms
+            )
             for _, entries in response:
                 for stream_id, payload in entries:
                     last_id = stream_id

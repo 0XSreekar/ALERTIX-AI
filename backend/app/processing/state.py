@@ -50,4 +50,6 @@ def assert_next_state(current: ProcessingState, next_state: ProcessingState) -> 
     except ValueError as exc:
         raise InvalidStateTransitionError(f"unknown transition {current} -> {next_state}") from exc
     if next_index != current_index + 1:
-        raise InvalidStateTransitionError(f"expected {STATE_ORDER[current_index + 1]}, got {next_state}")
+        raise InvalidStateTransitionError(
+            f"expected {STATE_ORDER[current_index + 1]}, got {next_state}"
+        )

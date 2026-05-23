@@ -1,13 +1,14 @@
 """Grounded AI endpoints for summaries, explanations, and recommendations."""
 
+import logging
+
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import get_settings
 from app.db import get_session
 from app.llm.rag import generate_grounded_response
-from app.config import get_settings
-import logging
 
 log = logging.getLogger(__name__)
 

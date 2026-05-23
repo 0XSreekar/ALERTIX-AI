@@ -140,12 +140,18 @@ class DamageSegmenter:
             raise ValueError("image must have shape (3, height, width)")
         started = time.perf_counter()
         with self.torch.no_grad():
-            logits, mask_logits = self.model(self.torch.tensor(arr[None, :, :, :], dtype=self.torch.float32))
+            logits, mask_logits = self.model(
+                self.torch.tensor(arr[None, :, :, :], dtype=self.torch.float32)
+            )
             probs = self.torch.softmax(logits[0], dim=0).cpu().numpy()
             mask = (self.torch.sigmoid(mask_logits[0, 0]).cpu().numpy() > 0.5).astype(np.uint8)
         class_idx = int(np.argmax(probs))
         latency_ms = (time.perf_counter() - started) * 1000.0
-        log.info("damage_segment_inference", latency_ms=round(latency_ms, 3), label=DAMAGE_CLASSES[class_idx])
+        log.info(
+            "damage_segment_inference",
+            latency_ms=round(latency_ms, 3),
+            label=DAMAGE_CLASSES[class_idx],
+        )
         return DamagePrediction(
             class_label=DAMAGE_CLASSES[class_idx],
             confidence=float(probs[class_idx]),

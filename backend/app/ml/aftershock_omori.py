@@ -45,7 +45,11 @@ class OmoriUtsuModel:
         if math.isclose(params.p, 1.0):
             return params.k * math.log((end + params.c) / (start + params.c))
         exponent = 1.0 - params.p
-        return params.k * (((end + params.c) ** exponent) - ((start + params.c) ** exponent)) / exponent
+        return (
+            params.k
+            * (((end + params.c) ** exponent) - ((start + params.c) ** exponent))
+            / exponent
+        )
 
     @staticmethod
     def _risk(probability: float) -> str:

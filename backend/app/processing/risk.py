@@ -34,8 +34,12 @@ def score_event(event: ProcessingEvent) -> tuple[float, AlertTier]:
         score = min(1.0, magnitude_score + shallow_bonus)
     elif hazard_type == "flood":
         severity = event.raw_payload.get("severity") or event.normalized.get("severity")
-        water_level = event.raw_payload.get("water_level_m") or event.normalized.get("water_level_m")
-        danger_level = event.raw_payload.get("danger_level_m") or event.normalized.get("danger_level_m")
+        water_level = event.raw_payload.get("water_level_m") or event.normalized.get(
+            "water_level_m"
+        )
+        danger_level = event.raw_payload.get("danger_level_m") or event.normalized.get(
+            "danger_level_m"
+        )
         try:
             score = min(1.0, max(0.0, float(severity) / 3.0))
         except (TypeError, ValueError):
@@ -45,7 +49,9 @@ def score_event(event: ProcessingEvent) -> tuple[float, AlertTier]:
                 score = 0.25
     elif hazard_type == "wildfire":
         frp = _value(event, "frp")
-        confidence = event.confidence if event.confidence is not None else _value(event, "confidence")
+        confidence = (
+            event.confidence if event.confidence is not None else _value(event, "confidence")
+        )
         try:
             score = min(1.0, float(frp) / 80.0)
         except (TypeError, ValueError):

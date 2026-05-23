@@ -14,9 +14,9 @@ from app.ingestion.common.logger import (
     log_duplicate_payload,
     log_ingestion_summary,
 )
-from app.ingestion.metrics import metrics as ingest_metrics
 from app.ingestion.common.storage import bulk_upsert_hazard_events
 from app.ingestion.common.stream import publish_hazard_events
+from app.ingestion.metrics import metrics as ingest_metrics
 from app.ingestion.weather.client import fetch_open_meteo_rainfall
 from app.ingestion.weather.parser import parse_open_meteo_rainfall
 from app.ingestion.weather.validator import validate_weather_event

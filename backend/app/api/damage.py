@@ -23,7 +23,9 @@ async def segment_damage(
     session: AsyncSession = Depends(get_session),
 ) -> dict:
     content = await file.read()
-    stored = await UploadStorage().store(session, content, file.filename or "damage.jpg", user.user_id)
+    stored = await UploadStorage().store(
+        session, content, file.filename or "damage.jpg", user.user_id
+    )
     checkpoint = get_settings().damage_model_checkpoint
     if not checkpoint:
         await session.commit()

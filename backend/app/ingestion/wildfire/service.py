@@ -15,9 +15,9 @@ from app.ingestion.common.logger import (
     log_duplicate_payload,
     log_ingestion_summary,
 )
-from app.ingestion.metrics import metrics as ingest_metrics
 from app.ingestion.common.storage import bulk_upsert_hazard_events, bulk_upsert_legacy_events
 from app.ingestion.common.stream import publish_hazard_events
+from app.ingestion.metrics import metrics as ingest_metrics
 from app.ingestion.wildfire.client import FIRMS_SOURCES, fetch_firms_csv
 from app.ingestion.wildfire.parser import parse_firms_csv
 from app.ingestion.wildfire.validator import validate_wildfire

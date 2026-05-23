@@ -125,7 +125,9 @@ async def predict_flood(
         basin_id=basin_id,
         basin_name=basin_name,
         forecast=forecast,
-        official_bulletin_agrees=any(r.intensity and r.intensity >= 2 for r in rows) if rows else None,
+        official_bulletin_agrees=any(r.intensity and r.intensity >= 2 for r in rows)
+        if rows
+        else None,
         model_version="phase2-cwc-passthrough",
     )
 
