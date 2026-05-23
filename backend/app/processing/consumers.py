@@ -110,7 +110,7 @@ class HazardConsumer:
             return
         title = f"{event.alert_tier.value.title()} {event.hazard_type} event"
         explanation = f"Automated sensor/model risk score: {event.risk_score:.2f}"
-        await self.session.execute(
+        result = await self.session.execute(
             text("""
                 INSERT INTO alerts (
                     hazard_type, severity, title, explanation, explanation_status,
@@ -120,6 +120,7 @@ class HazardConsumer:
                     :hazard_type, :severity, :title, :explanation, 'generated',
                     :probability, ARRAY[:event_id]::uuid[], 'processing-v1', now()
                 )
+                RETURNING id
             """),
             {
                 "hazard_type": event.hazard_type,
@@ -130,6 +131,23 @@ class HazardConsumer:
                 "event_id": event.event_id,
             },
         )
+        alert_row = result.fetchone()
+        if alert_row is not None:
+            from app.models.audit_log import write_audit_log
+
+            await write_audit_log(
+                self.session,
+                action="alert_created",
+                entity_type="alerts",
+                entity_id=alert_row.id,
+                role="system",
+                details={
+                    "hazard_type": event.hazard_type,
+                    "severity": event.alert_tier.value,
+                    "risk_score": event.risk_score,
+                    "source_event_id": event.event_id,
+                },
+            )
 
     async def move_to_retry(self, event: ProcessingEvent, reason: str) -> None:
         event.state = ProcessingState.RETRY

@@ -8,7 +8,7 @@ from typing import Annotated
 import jwt
 from fastapi import Depends, Header, HTTPException, status
 
-from app.config import get_settings
+from app.config import get_jwt_secret, get_settings
 
 
 @dataclass(frozen=True)
@@ -19,7 +19,7 @@ class CurrentUser:
 
 
 def _jwt_secret() -> str:
-    return get_settings().supabase_jwt_secret or "local-dev-secret-change-in-prod"
+    return get_jwt_secret()
 
 
 def _decode_jwt(token: str) -> dict:

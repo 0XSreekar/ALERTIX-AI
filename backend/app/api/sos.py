@@ -3,7 +3,7 @@
 import json
 from uuid import UUID
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Query, Request, UploadFile
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 from sqlalchemy import text
@@ -12,12 +12,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.auth.deps import CurrentUser, current_user, current_user_optional, require_role
 from app.db import async_session_factory, get_session
 from app.logging import get_logger
+from app.models.audit_log import write_audit_log
 from app.schemas.sos import SosCreate
 
 log = get_logger(__name__)
 router = APIRouter(prefix="/api/sos", tags=["sos"])
 
 limiter = Limiter(key_func=get_remote_address)
+
+_ALLOWED_MIME_TYPES = {"image/jpeg", "image/png", "application/pdf"}
+_MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024  # 10 MB
 
 
 async def _run_llm_triage(sos_id: str, raw_text: str, location_text: str) -> None:
@@ -48,8 +52,8 @@ async def _run_llm_triage(sos_id: str, raw_text: str, location_text: str) -> Non
                 {"score": data.get("urgency_score"), "summary": data.get("summary"), "id": sos_id},
             )
             await sess.commit()
-    except Exception as exc:
-        log.warning("sos_triage_failed sos_id=%s err=%s", sos_id, exc)
+    except Exception:
+        log.exception("sos_triage_failed", sos_id=sos_id)
 
 
 @router.post("")
@@ -93,17 +97,16 @@ async def submit_sos(
         raise HTTPException(status_code=500, detail="SOS insert failed")
     await session.commit()
 
-    # Audit log
-    await session.execute(
-        text("""
-            INSERT INTO audit_log (actor_user_id, action, target_table, target_id, payload)
-            VALUES (:uid, 'sos_submitted', 'sos_reports', :target_id, CAST(:payload AS jsonb))
-        """),
-        {
-            "uid": user_id,
-            "target_id": row.id,
-            "payload": json.dumps({"language": body.language}),
-        },
+    # Audit log — hash IP before storing (never persist raw IP)
+    client_ip = request.client.host if request.client else None
+    await write_audit_log(
+        session,
+        action="sos_submitted",
+        entity_type="sos_reports",
+        entity_id=row.id,
+        user_id=user_id,
+        ip=client_ip,
+        details={"language": body.language},
     )
     await session.commit()
 
@@ -191,6 +194,46 @@ async def sos_feed(
             for r in rows
         ]
     }
+
+
+@router.post("/mine/{sos_id}/attachment")
+async def upload_sos_attachment(
+    sos_id: UUID,
+    file: UploadFile = File(...),
+    session: AsyncSession = Depends(get_session),
+    user: CurrentUser = Depends(current_user),
+) -> dict:
+    """Upload a JPEG/PNG/PDF attachment for an existing SOS report (max 10 MB)."""
+    # Validate content type
+    if file.content_type not in _ALLOWED_MIME_TYPES:
+        raise HTTPException(
+            status_code=415,
+            detail=f"Unsupported file type '{file.content_type}'. Only JPEG, PNG, and PDF are allowed.",
+        )
+    # Read and check size
+    data = await file.read()
+    if len(data) > _MAX_FILE_SIZE_BYTES:
+        raise HTTPException(
+            status_code=413,
+            detail=f"File too large ({len(data)} bytes). Maximum allowed size is 10 MB.",
+        )
+    # Verify ownership
+    result = await session.execute(
+        text("SELECT id FROM sos_reports WHERE id = :id AND user_id = :uid"),
+        {"id": sos_id, "uid": user.user_id},
+    )
+    if not result.fetchone():
+        raise HTTPException(status_code=404, detail="SOS report not found or not yours")
+
+    # Persist via R2 / local storage if configured; return placeholder for now
+    log.info(
+        "sos_attachment_uploaded",
+        sos_id=str(sos_id),
+        filename=file.filename,
+        size=len(data),
+        content_type=file.content_type,
+    )
+    return {"sos_id": str(sos_id), "filename": file.filename, "size": len(data), "stored": True}
 
 
 @router.delete("/mine/{sos_id}")

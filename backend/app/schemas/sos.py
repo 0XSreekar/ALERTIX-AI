@@ -3,6 +3,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
+from app.models.sos import SosStatus
+
 
 class SosCreate(BaseModel):
     raw_text: str = Field(..., min_length=10, max_length=5000)
@@ -22,6 +24,7 @@ class SosOut(BaseModel):
     extracted_location_text: str | None = None
     urgency_score: float | None = None
     triaged: bool = False
+    status: SosStatus = SosStatus.pending
     llm_summary: str | None = None
     related_event_id: UUID | None = None
     created_at: datetime
