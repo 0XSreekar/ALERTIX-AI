@@ -2,22 +2,26 @@ import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import HazardMap from "@/components/Map";
 import RiskGauge from "@/components/RiskGauge";
+import WsStatusBadge from "@/components/WsStatusBadge";
+import { Skeleton } from "@/components/ui/skeleton";
 import { fetchRecentEvents, fetchEarthquakePrediction } from "@/lib/api";
 import { earthquakeEventsWs } from "@/lib/ws";
+import { queryKeys } from "@/lib/queryKeys";
+import { Button } from "@/components/ui/button";
 import type { HazardEvent } from "@/lib/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 export default function EarthquakeTab() {
   const [liveEvents, setLiveEvents] = useState<HazardEvent[]>([]);
 
-  const { data, isLoading } = useQuery({
-    queryKey: ["events", "earthquake", "recent"],
+  const { data, isLoading, isError, refetch } = useQuery({
+    queryKey: queryKeys.events.recent("earthquake", 24),
     queryFn: () => fetchRecentEvents("earthquake", 24),
     refetchInterval: 60_000,
   });
 
   const { data: prediction } = useQuery({
-    queryKey: ["predict", "earthquake"],
+    queryKey: queryKeys.predict.earthquake(20.5, 78.9, 500),
     queryFn: () => fetchEarthquakePrediction(20.5, 78.9, 500),
     refetchInterval: 300_000,
   });
@@ -36,11 +40,14 @@ export default function EarthquakeTab() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-2xl font-bold">Earthquake Monitor</h2>
-        <span className="text-sm text-muted-foreground">
-          {uniqueEvents.length} events in last 24h
-        </span>
+        <div className="flex items-center gap-3">
+          <WsStatusBadge ws={earthquakeEventsWs} label="Live" />
+          <span className="text-sm text-muted-foreground">
+            {uniqueEvents.length} events in last 24h
+          </span>
+        </div>
       </div>
 
       {/* Disclaimer */}
@@ -51,13 +58,14 @@ export default function EarthquakeTab() {
       </div>
 
       {/* Map */}
-      <HazardMap
-        events={uniqueEvents}
-        className="h-[400px] w-full rounded-lg lg:h-[500px]"
-      />
+      {isLoading ? (
+        <Skeleton className="h-[400px] w-full rounded-lg lg:h-[500px]" />
+      ) : (
+        <HazardMap events={uniqueEvents} className="h-[400px] w-full rounded-lg lg:h-[500px]" />
+      )}
 
       {/* Stats row */}
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <RiskGauge
           value={(prediction?.anomaly_score ?? 0) * 100}
           label="Anomaly Score"
@@ -79,7 +87,18 @@ export default function EarthquakeTab() {
         </CardHeader>
         <CardContent>
           {isLoading ? (
-            <p className="text-sm text-muted-foreground">Loading...</p>
+            <div className="space-y-2">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <Skeleton key={i} className="h-8 w-full" />
+              ))}
+            </div>
+          ) : isError ? (
+            <div className="py-4 text-center">
+              <p className="text-sm text-red-400">Failed to load events.</p>
+              <Button variant="outline" size="sm" className="mt-2" onClick={() => void refetch()}>
+                Retry
+              </Button>
+            </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">

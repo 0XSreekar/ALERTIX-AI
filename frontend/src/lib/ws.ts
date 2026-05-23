@@ -1,26 +1,49 @@
 import type { Alert, HazardEvent } from "./types";
 
 type MessageHandler<T> = (data: T) => void;
+type StatusHandler = (status: WsStatus) => void;
+
+export type WsStatus = "connecting" | "connected" | "disconnected" | "reconnecting";
 
 const WS_BASE = import.meta.env.VITE_WS_BASE_URL || `ws://${window.location.host}`;
+
+const MIN_RECONNECT_MS = 1_000;
+const MAX_RECONNECT_MS = 30_000;
 
 class AlertixWebSocket<T> {
   private ws: WebSocket | null = null;
   private url: string;
   private handlers: Set<MessageHandler<T>> = new Set();
+  private statusHandlers: Set<StatusHandler> = new Set();
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private pingTimer: ReturnType<typeof setInterval> | null = null;
+  private reconnectDelay = MIN_RECONNECT_MS;
+  private destroyed = false;
+  private _status: WsStatus = "disconnected";
 
   constructor(path: string) {
     this.url = `${WS_BASE}${path}`;
   }
 
+  get status(): WsStatus {
+    return this._status;
+  }
+
+  private setStatus(s: WsStatus) {
+    this._status = s;
+    this.statusHandlers.forEach((h) => h(s));
+  }
+
   connect() {
+    if (this.destroyed) return;
     if (this.ws?.readyState === WebSocket.OPEN) return;
 
+    this.setStatus("connecting");
     this.ws = new WebSocket(this.url);
 
     this.ws.onopen = () => {
+      this.reconnectDelay = MIN_RECONNECT_MS; // reset backoff on success
+      this.setStatus("connected");
       this.pingTimer = setInterval(() => {
         if (this.ws?.readyState === WebSocket.OPEN) {
           this.ws.send("ping");
@@ -31,7 +54,7 @@ class AlertixWebSocket<T> {
     this.ws.onmessage = (event) => {
       if (event.data === "pong") return;
       try {
-        const data = JSON.parse(event.data) as T;
+        const data = JSON.parse(event.data as string) as T;
         this.handlers.forEach((h) => h(data));
       } catch {
         // ignore non-JSON messages
@@ -39,8 +62,17 @@ class AlertixWebSocket<T> {
     };
 
     this.ws.onclose = () => {
-      this.cleanup();
-      this.reconnectTimer = setTimeout(() => this.connect(), 5000);
+      this.cleanupTimers();
+      if (this.destroyed) {
+        this.setStatus("disconnected");
+        return;
+      }
+      this.setStatus("reconnecting");
+      const delay = this.reconnectDelay;
+      this.reconnectDelay = Math.min(this.reconnectDelay * 2, MAX_RECONNECT_MS);
+      this.reconnectTimer = setTimeout(() => {
+        if (!this.destroyed) this.connect();
+      }, delay);
     };
 
     this.ws.onerror = () => {
@@ -57,13 +89,30 @@ class AlertixWebSocket<T> {
     };
   }
 
-  disconnect() {
-    this.cleanup();
-    this.ws?.close();
-    this.ws = null;
+  subscribeStatus(handler: StatusHandler) {
+    this.statusHandlers.add(handler);
+    handler(this._status); // immediately emit current status
+    return () => this.statusHandlers.delete(handler);
   }
 
-  private cleanup() {
+  disconnect() {
+    this.destroyed = true;
+    this.cleanupTimers();
+    this.ws?.close();
+    this.ws = null;
+    this.setStatus("disconnected");
+  }
+
+  /** Reconnect from scratch (e.g., after page regains network). */
+  reconnect() {
+    this.destroyed = false;
+    this.reconnectDelay = MIN_RECONNECT_MS;
+    this.cleanupTimers();
+    this.ws?.close();
+    this.connect();
+  }
+
+  private cleanupTimers() {
     if (this.pingTimer) clearInterval(this.pingTimer);
     if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
     this.pingTimer = null;

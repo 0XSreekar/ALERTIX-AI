@@ -1,46 +1,46 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
-import { getUser, signOut } from "@/lib/localAuth";
+import { getUser, signOut, checkTokenExpiry } from "@/lib/localAuth";
 import RegionSelector from "@/components/RegionSelector";
 import Footer from "@/components/Footer";
 import { cn } from "@/lib/utils";
 
 const tabs = [
-  { path: "earthquake", label: "Earthquake", icon: "🔴" },
-  { path: "flood", label: "Flood", icon: "🔵" },
-  { path: "cyclone", label: "Cyclone", icon: "🟣" },
-  { path: "wildfire", label: "Wildfire", icon: "🟠" },
-  { path: "landslide", label: "Landslide", icon: "🟤" },
-  { path: "damage", label: "Damage", icon: "⬜" },
-  { path: "sos", label: "SOS", icon: "🆘" },
-  { path: "alerts", label: "Alerts", icon: "🔔" },
-];
+  { path: "earthquake", label: "Earthquake", icon: "🔴", minRole: "citizen" },
+  { path: "flood", label: "Flood", icon: "🔵", minRole: "citizen" },
+  { path: "cyclone", label: "Cyclone", icon: "🟣", minRole: "citizen" },
+  { path: "wildfire", label: "Wildfire", icon: "🟠", minRole: "citizen" },
+  { path: "landslide", label: "Landslide", icon: "🟤", minRole: "citizen" },
+  { path: "damage", label: "Damage", icon: "⬜", minRole: "citizen" },
+  { path: "sos", label: "SOS", icon: "🆘", minRole: "citizen" },
+  { path: "alerts", label: "Alerts", icon: "🔔", minRole: "citizen" },
+] as const;
+
+const ROLE_LEVEL: Record<string, number> = {
+  citizen: 0,
+  official: 1,
+  admin: 2,
+};
 
 export default function Dashboard() {
-  const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
   const location = useLocation();
 
-  useEffect(() => {
-    const user = getUser();
-    if (!user) {
-      navigate("/login");
-    }
-    setLoading(false);
-  }, [navigate]);
+  // Auth check (backup – ProtectedRoute handles the primary redirect)
+  checkTokenExpiry();
+  const user = getUser();
+  if (!user) {
+    navigate("/login");
+    return null;
+  }
+
+  const userLevel = ROLE_LEVEL[user.role] ?? 0;
+  const visibleTabs = tabs.filter((t) => userLevel >= (ROLE_LEVEL[t.minRole] ?? 0));
 
   const handleLogout = () => {
     signOut();
     navigate("/");
   };
-
-  if (loading) {
-    return (
-      <div className="flex h-screen items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-      </div>
-    );
-  }
 
   const activeTab = location.pathname.split("/").pop() || "earthquake";
 
@@ -52,13 +52,23 @@ export default function Dashboard() {
           <Link to="/" className="text-lg font-bold text-primary">
             Alertix AI
           </Link>
-          <RegionSelector />
-          <button
-            onClick={handleLogout}
-            className="text-sm text-muted-foreground hover:text-foreground"
-          >
-            Logout
-          </button>
+          <div className="flex items-center gap-3">
+            <RegionSelector />
+            {user.role === "admin" && (
+              <Link
+                to="/admin"
+                className="rounded-md border border-red-800/50 px-2.5 py-1 text-xs font-semibold text-red-400 hover:bg-red-950/30"
+              >
+                Admin Panel
+              </Link>
+            )}
+            <button
+              onClick={handleLogout}
+              className="text-sm text-muted-foreground hover:text-foreground"
+            >
+              Logout
+            </button>
+          </div>
         </div>
       </header>
 
@@ -66,7 +76,7 @@ export default function Dashboard() {
         {/* Sidebar */}
         <aside className="hidden w-52 shrink-0 border-r bg-card p-4 lg:block">
           <nav className="flex flex-col gap-1">
-            {tabs.map((tab) => (
+            {visibleTabs.map((tab) => (
               <Link
                 key={tab.path}
                 to={`/dashboard/${tab.path}`}
@@ -86,7 +96,7 @@ export default function Dashboard() {
 
         {/* Mobile tab bar */}
         <div className="flex overflow-x-auto border-b lg:hidden">
-          {tabs.map((tab) => (
+          {visibleTabs.map((tab) => (
             <Link
               key={tab.path}
               to={`/dashboard/${tab.path}`}

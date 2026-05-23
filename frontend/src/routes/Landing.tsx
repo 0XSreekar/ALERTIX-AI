@@ -1,3 +1,4 @@
+import React from "react";
 import { Link } from "react-router-dom";
 import { Suspense, lazy } from "react";
 import { motion } from "framer-motion";
@@ -5,6 +6,7 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { Button } from "@/components/ui/button";
 
+// Lazy-load Three.js to keep it out of the initial bundle
 const ThreeEarth = lazy(() => import("@/components/ThreeEarth"));
 
 const hazards = [
@@ -80,11 +82,15 @@ export default function Landing() {
 
       {/* ── Hero ─────────────────────────────────────────────────── */}
       <section className="relative flex min-h-[92vh] items-center justify-center overflow-hidden">
-        {/* Volcano background */}
+        {/* Volcano background — Three.js is lazy loaded */}
         <div className="absolute inset-0 -z-10">
-          <Suspense fallback={<div className="h-full bg-background" />}>
+          <React.Suspense
+            fallback={
+              <div className="h-full w-full animate-pulse rounded-full bg-slate-800/30" />
+            }
+          >
             <ThreeEarth className="h-full w-full opacity-55" />
-          </Suspense>
+          </React.Suspense>
         </div>
 
         {/* Gradient overlays */}

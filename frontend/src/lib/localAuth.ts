@@ -67,3 +67,38 @@ export async function signIn(email: string, password: string) {
 export function signOut() {
   clearSession();
 }
+
+/**
+ * Decodes a JWT payload without verification (base64 only).
+ * Returns null if the token is missing or malformed.
+ */
+function decodeJwtPayload(token: string): Record<string, unknown> | null {
+  try {
+    const parts = token.split(".");
+    if (parts.length !== 3) return null;
+    const payload = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+    const json = atob(payload);
+    return JSON.parse(json) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Call on app load and before API calls.
+ * If the stored JWT is expired, clears the session so the user is
+ * redirected to /login by ProtectedRoute / the 401 interceptor.
+ */
+export function checkTokenExpiry(): void {
+  const token = getToken();
+  if (!token) return;
+  const payload = decodeJwtPayload(token);
+  if (!payload) {
+    clearSession();
+    return;
+  }
+  const exp = typeof payload.exp === "number" ? payload.exp : null;
+  if (exp !== null && Date.now() / 1000 > exp) {
+    clearSession();
+  }
+}

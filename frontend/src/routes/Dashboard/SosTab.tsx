@@ -1,39 +1,114 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { submitSos, fetchMySos } from "@/lib/api";
+import { fetchMySos } from "@/lib/api";
+import { queryKeys } from "@/lib/queryKeys";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Progress } from "@/components/ui/progress";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+
+const BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
+
+function getAuthToken(): string | null {
+  return localStorage.getItem("alertix_token");
+}
 
 export default function SosTab() {
   const [text, setText] = useState("");
   const [lat, setLat] = useState("");
   const [lon, setLon] = useState("");
   const [consent, setConsent] = useState(false);
-  const [status, setStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
+  const [file, setFile] = useState<File | null>(null);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [status, setStatus] = useState<"idle" | "uploading" | "sending" | "sent" | "error">("idle");
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { data: myReports, refetch } = useQuery({
-    queryKey: ["sos", "mine"],
+    queryKey: queryKeys.sos.mine,
     queryFn: fetchMySos,
   });
+
+  const uploadFileWithProgress = (f: File): Promise<string | null> => {
+    return new Promise((resolve, reject) => {
+      const token = getAuthToken();
+      const xhr = new XMLHttpRequest();
+      const form = new FormData();
+      form.append("file", f);
+
+      xhr.upload.onprogress = (evt) => {
+        if (evt.lengthComputable) {
+          setUploadProgress(Math.round((evt.loaded / evt.total) * 100));
+        }
+      };
+
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          try {
+            const res = JSON.parse(xhr.responseText) as { url?: string };
+            resolve(res.url ?? null);
+          } catch {
+            resolve(null);
+          }
+        } else {
+          reject(new Error(`Upload failed: ${xhr.status}`));
+        }
+      };
+
+      xhr.onerror = () => reject(new Error("Upload network error"));
+
+      xhr.open("POST", `${BASE}/api/sos/upload`);
+      if (token) xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+      xhr.send(form);
+    });
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!consent) return;
-    setStatus("sending");
+
+    setStatus("idle");
+    setUploadProgress(0);
+
+    let mediaUrl: string | null = null;
+
     try {
-      await submitSos({
+      if (file) {
+        setStatus("uploading");
+        mediaUrl = await uploadFileWithProgress(file);
+        setUploadProgress(100);
+      }
+
+      setStatus("sending");
+
+      const token = getAuthToken();
+      const body = {
         raw_text: text,
         latitude: lat ? parseFloat(lat) : undefined,
         longitude: lon ? parseFloat(lon) : undefined,
         consent_given: true,
+        ...(mediaUrl ? { media_url: mediaUrl } : {}),
+      };
+
+      const res = await fetch(`${BASE}/api/sos`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(body),
       });
+
+      if (!res.ok) throw new Error(`SOS submit failed: ${res.status}`);
+
       setStatus("sent");
       setText("");
       setLat("");
       setLon("");
       setConsent(false);
-      refetch();
+      setFile(null);
+      setUploadProgress(0);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      void refetch();
     } catch {
       setStatus("error");
     }
@@ -83,6 +158,30 @@ export default function SosTab() {
                 </Button>
               </div>
             </div>
+
+            {/* File upload with progress */}
+            <div>
+              <label className="mb-1 block text-sm font-medium">
+                Attach media <span className="text-xs text-muted-foreground">(optional)</span>
+              </label>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*,video/*"
+                onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+                className="block w-full text-sm text-muted-foreground file:mr-4 file:rounded-md file:border-0 file:bg-primary file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-primary-foreground hover:file:bg-primary/90"
+              />
+              {status === "uploading" && (
+                <div className="mt-2 space-y-1">
+                  <div className="flex justify-between text-xs text-muted-foreground">
+                    <span>Uploading…</span>
+                    <span>{uploadProgress}%</span>
+                  </div>
+                  <Progress value={uploadProgress} />
+                </div>
+              )}
+            </div>
+
             <div className="flex items-center gap-2">
               <input
                 type="checkbox"
@@ -95,8 +194,15 @@ export default function SosTab() {
                 I consent to the processing of this report per DPDPA 2023.
               </label>
             </div>
-            <Button type="submit" disabled={!consent || status === "sending"}>
-              {status === "sending" ? "Submitting..." : "Submit SOS"}
+            <Button
+              type="submit"
+              disabled={!consent || status === "uploading" || status === "sending"}
+            >
+              {status === "uploading"
+                ? "Uploading…"
+                : status === "sending"
+                  ? "Submitting…"
+                  : "Submit SOS"}
             </Button>
             {status === "sent" && (
               <p className="text-sm text-green-400">Report submitted. Stay safe.</p>

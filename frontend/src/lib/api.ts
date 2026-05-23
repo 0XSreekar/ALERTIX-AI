@@ -7,7 +7,7 @@ import type {
   SosReport,
   WildfirePrediction,
 } from "./types";
-import { getToken } from "./localAuth";
+import { getToken, clearSession, checkTokenExpiry } from "./localAuth";
 import { cacheAlerts, queueCitizenReport } from "./offline";
 
 const BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
@@ -17,9 +17,27 @@ function authHeaders(): Record<string, string> {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
+/** Fires a toast-like notification using the global toast queue (if available). */
+function notifySessionExpired() {
+  // Dispatch a custom event; the ToastProvider in main.tsx listens for it.
+  window.dispatchEvent(new CustomEvent("alertix:session-expired"));
+}
+
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
+  // Check token expiry before every API call
+  checkTokenExpiry();
+
   const headers = { ...authHeaders(), ...init?.headers };
   const res = await fetch(`${BASE}${path}`, { ...init, headers });
+
+  if (res.status === 401) {
+    clearSession();
+    notifySessionExpired();
+    // Redirect to /login — works inside and outside React Router context
+    window.location.href = "/login";
+    throw new Error("Session expired");
+  }
+
   if (!res.ok) {
     const body = await res.text();
     throw new Error(`API ${res.status}: ${body}`);
@@ -133,4 +151,93 @@ export async function submitCitizenReport(body: {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
+}
+
+// ── Admin ────────────────────────────────────────────────────
+
+export interface AdminUser {
+  user_id: string;
+  email: string;
+  full_name: string;
+  role: string;
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface AdminAlert {
+  id: string;
+  hazard_type: string;
+  severity: string;
+  title: string;
+  explanation: string | null;
+  created_at: string;
+  expires_at: string | null;
+  status: string;
+  latitude: number | null;
+  longitude: number | null;
+}
+
+export interface AuditLogEntry {
+  id: string;
+  timestamp: string;
+  action: string;
+  entity_type: string;
+  entity_id: string | null;
+  user_id: string | null;
+  details: Record<string, unknown> | null;
+}
+
+export interface SystemStatus {
+  backend_version: string;
+  redis_status: string;
+  db_status: string;
+  env_config: Record<string, string>;
+}
+
+export function fetchAdminUsers(page = 0, pageSize = 50) {
+  return apiFetch<{ users: AdminUser[]; total: number }>(
+    `/api/admin/users?skip=${page * pageSize}&limit=${pageSize}`,
+  );
+}
+
+export function updateUserRole(userId: string, role: string) {
+  return apiFetch<{ status: string }>(`/api/admin/users/${userId}/role`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ role }),
+  });
+}
+
+export function deactivateUser(userId: string) {
+  return apiFetch<{ status: string }>(`/api/admin/users/${userId}/deactivate`, {
+    method: "POST",
+  });
+}
+
+export function fetchAdminAlerts(page = 0, pageSize = 50) {
+  return apiFetch<{ alerts: AdminAlert[]; total: number }>(
+    `/api/admin/alerts?skip=${page * pageSize}&limit=${pageSize}`,
+  );
+}
+
+export function acknowledgeAlert(alertId: string) {
+  return apiFetch<{ status: string }>(`/api/admin/alerts/${alertId}/acknowledge`, {
+    method: "POST",
+  });
+}
+
+export function dismissAlert(alertId: string) {
+  return apiFetch<{ status: string }>(`/api/admin/alerts/${alertId}/dismiss`, {
+    method: "POST",
+  });
+}
+
+export function fetchAuditLog(page = 0, pageSize = 50) {
+  return apiFetch<{ entries: AuditLogEntry[]; total: number }>(
+    `/api/admin/audit-log?skip=${page * pageSize}&limit=${pageSize}`,
+  );
+}
+
+export function fetchSystemStatus() {
+  return apiFetch<SystemStatus>("/api/admin/system-status");
 }

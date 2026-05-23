@@ -58,6 +58,7 @@ dependencies = [
     # Observability
     "sentry-sdk[fastapi]==2.19.2",
     "structlog==24.4.0",
+    "python-json-logger==2.0.7",
 
     # Email
     "resend==2.5.1",

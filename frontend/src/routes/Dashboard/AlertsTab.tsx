@@ -1,15 +1,19 @@
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import AlertCard from "@/components/AlertCard";
+import { Skeleton } from "@/components/ui/skeleton";
+import WsStatusBadge from "@/components/WsStatusBadge";
 import { fetchAlerts } from "@/lib/api";
 import { alertsWs } from "@/lib/ws";
+import { queryKeys } from "@/lib/queryKeys";
+import { Button } from "@/components/ui/button";
 import type { Alert } from "@/lib/types";
 
 export default function AlertsTab() {
   const [liveAlerts, setLiveAlerts] = useState<Alert[]>([]);
 
-  const { data, isLoading } = useQuery({
-    queryKey: ["alerts"],
+  const { data, isLoading, isError, refetch } = useQuery({
+    queryKey: queryKeys.alerts.all,
     queryFn: () => fetchAlerts(),
     refetchInterval: 60_000,
   });
@@ -26,15 +30,29 @@ export default function AlertsTab() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-2xl font-bold">Active Alerts</h2>
-        <span className="text-sm text-muted-foreground">
-          {uniqueAlerts.length} active alert{uniqueAlerts.length !== 1 && "s"}
-        </span>
+        <div className="flex items-center gap-3">
+          <WsStatusBadge ws={alertsWs} label="Live" />
+          <span className="text-sm text-muted-foreground">
+            {uniqueAlerts.length} active alert{uniqueAlerts.length !== 1 && "s"}
+          </span>
+        </div>
       </div>
 
       {isLoading ? (
-        <p className="text-sm text-muted-foreground">Loading alerts...</p>
+        <div className="space-y-3">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <Skeleton key={i} className="h-20 w-full rounded-lg" />
+          ))}
+        </div>
+      ) : isError ? (
+        <div className="rounded-lg border border-red-800/40 bg-red-950/20 p-8 text-center">
+          <p className="text-sm text-red-400">Failed to load alerts.</p>
+          <Button variant="outline" size="sm" className="mt-3" onClick={() => void refetch()}>
+            Retry
+          </Button>
+        </div>
       ) : uniqueAlerts.length === 0 ? (
         <div className="rounded-lg border p-8 text-center">
           <p className="text-lg font-medium">No active alerts</p>

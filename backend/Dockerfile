@@ -24,6 +24,10 @@ RUN pip install -e .
 
 COPY . .
 
+# Run as non-root user for security
+RUN addgroup --system nonroot && adduser --system --ingroup nonroot nonroot
+USER nonroot
+
 EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
     CMD curl -fsS http://localhost:8000/health || exit 1

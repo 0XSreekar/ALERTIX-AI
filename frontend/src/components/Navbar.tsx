@@ -1,6 +1,6 @@
 import { Link, useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
-import { getUser, signOut, type LocalUser } from "@/lib/localAuth";
+import { getUser, signOut, checkTokenExpiry, type LocalUser } from "@/lib/localAuth";
 import { Button } from "@/components/ui/button";
 
 export default function Navbar() {
@@ -8,8 +8,12 @@ export default function Navbar() {
   const navigate = useNavigate();
 
   useEffect(() => {
+    checkTokenExpiry();
     setUser(getUser());
-    const onStorage = () => setUser(getUser());
+    const onStorage = () => {
+      checkTokenExpiry();
+      setUser(getUser());
+    };
     window.addEventListener("storage", onStorage);
     return () => window.removeEventListener("storage", onStorage);
   }, []);
@@ -19,6 +23,9 @@ export default function Navbar() {
     setUser(null);
     navigate("/");
   };
+
+  const isAdmin = user?.role === "admin";
+  const isOfficial = user?.role === "official" || user?.role === "admin";
 
   return (
     <nav className="sticky top-0 z-50 border-b bg-background/80 backdrop-blur">
@@ -38,6 +45,21 @@ export default function Navbar() {
               <Link to="/dashboard">
                 <Button size="sm">Dashboard</Button>
               </Link>
+              {isOfficial && (
+                <Link
+                  to="/dashboard/sos"
+                  className="text-sm text-muted-foreground hover:text-foreground"
+                >
+                  SOS Triage
+                </Link>
+              )}
+              {isAdmin && (
+                <Link to="/admin">
+                  <Button size="sm" variant="outline" className="border-red-800/50 text-red-400">
+                    Admin
+                  </Button>
+                </Link>
+              )}
               <Button size="sm" variant="ghost" onClick={handleLogout}>
                 Logout
               </Button>
