@@ -39,6 +39,8 @@ frontend/.vite/
 .vscode/
 !.vscode/extensions.json
 .idea/
+.claude/worktrees/
+.claude/settings.local.json
 *.swp
 *.swo
 .DS_Store
