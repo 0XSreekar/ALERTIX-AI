@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { getUser, signOut, checkTokenExpiry } from "@/lib/localAuth";
 import RegionSelector from "@/components/RegionSelector";

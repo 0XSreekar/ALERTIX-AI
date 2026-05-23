@@ -17,7 +17,6 @@ import {
   type AdminAlert,
   type AuditLogEntry,
 } from "@/lib/api";
-import { fetchAlerts } from "@/lib/api";
 import { queryKeys } from "@/lib/queryKeys";
 import { Link } from "react-router-dom";
 import { signOut } from "@/lib/localAuth";
