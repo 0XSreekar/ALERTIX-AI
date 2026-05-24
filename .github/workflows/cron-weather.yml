@@ -1,0 +1,22 @@
+name: Cron — Weather Ingestion
+
+on:
+  schedule:
+    - cron: "0 * * * *"
+  workflow_dispatch:
+
+jobs:
+  ingest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Trigger Open-Meteo weather ingestion
+        env:
+          BACKEND_URL: ${{ secrets.BACKEND_URL }}
+          CRON_TOKEN: ${{ secrets.CRON_TOKEN }}
+        run: |
+          curl -sf -X POST \
+            -H "X-Cron-Token: $CRON_TOKEN" \
+            "${BACKEND_URL}/internal/ingest/weather" \
+            --max-time 90 \
+            || echo "Request failed or timed out (cold start expected)"

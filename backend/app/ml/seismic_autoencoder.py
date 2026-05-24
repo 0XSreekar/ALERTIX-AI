@@ -16,7 +16,17 @@ import numpy as np
 log = logging.getLogger(__name__)
 
 _MODEL_CACHE: object | None = None
-_WEIGHTS_PATH = Path("/tmp/seismic_ae.pt")  # downloaded from R2 on first call
+
+
+def _resolve_weights_path() -> Path:
+    """Resolve checkpoint path from settings, falling back to legacy /tmp location."""
+    from app.config import get_settings
+
+    settings = get_settings()
+    if settings.seismic_ae_checkpoint:
+        return Path(settings.seismic_ae_checkpoint)
+    # Legacy default — used in Linux containers
+    return Path("/tmp/seismic_ae.pt")
 
 
 def _try_load_model() -> object | None:
@@ -24,8 +34,9 @@ def _try_load_model() -> object | None:
     global _MODEL_CACHE
     if _MODEL_CACHE is not None:
         return _MODEL_CACHE
-    if not _WEIGHTS_PATH.exists():
-        log.info("seismic_ae_weights_not_found path=%s", _WEIGHTS_PATH)
+    weights_path = _resolve_weights_path()
+    if not weights_path.exists():
+        log.info("seismic_ae_weights_not_found path=%s", weights_path)
         return None
     try:
         import torch
@@ -33,25 +44,36 @@ def _try_load_model() -> object | None:
         from app.ml.seismic_model import SeismicAutoencoder
 
         model = SeismicAutoencoder()
-        model.load_state_dict(torch.load(_WEIGHTS_PATH, map_location="cpu"))
+        model.load_state_dict(torch.load(weights_path, map_location="cpu"))
         model.eval()
         _MODEL_CACHE = model
-        log.info("seismic_ae_loaded")
+        log.info("seismic_ae_loaded path=%s", weights_path)
         return model
     except Exception as exc:
         log.warning("seismic_ae_load_failed: %s", exc)
         return None
 
 
-def score_event(features: list[float]) -> float:
-    """Return reconstruction error (anomaly score). -1.0 = model unavailable."""
+def score_event(features: list[float] | list[list[float]]) -> float:
+    """Return reconstruction MSE (anomaly score). -1.0 = model unavailable.
+
+    Accepts either:
+      - A single 8-dim feature vector (will be tiled across the 30-step window)
+      - A full (30, 8) sequence of features
+    """
     model = cast(Any, _try_load_model())
     if model is None:
         return -1.0
     try:
         import torch
 
-        x = torch.tensor([features], dtype=torch.float32)
+        arr = np.asarray(features, dtype=np.float32)
+        if arr.ndim == 1:
+            arr = np.tile(arr[None, :], (30, 1))
+        elif arr.ndim != 2:
+            log.warning("seismic_ae invalid input ndim=%d", arr.ndim)
+            return -1.0
+        x = torch.tensor(arr[None, :, :], dtype=torch.float32)  # (1, seq_len, input_size)
         with torch.no_grad():
             recon = model(x)
         mse = float(torch.mean((recon - x) ** 2).item())

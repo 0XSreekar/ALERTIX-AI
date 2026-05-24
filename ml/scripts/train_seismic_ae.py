@@ -39,6 +39,9 @@ SEQ_LEN = 30
 
 def load_catalog(path: Path) -> pd.DataFrame:
     df = pd.read_csv(path, parse_dates=["time"])
+    # USGS uses 'mag' — rename to 'magnitude' for consistency
+    if "mag" in df.columns and "magnitude" not in df.columns:
+        df = df.rename(columns={"mag": "magnitude"})
     df = df.sort_values("time").reset_index(drop=True)
     df["count_30d"] = (
         df.set_index("time")["magnitude"]

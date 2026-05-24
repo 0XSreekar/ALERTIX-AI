@@ -12,7 +12,7 @@ const MAX_RECONNECT_MS = 30_000;
 
 class AlertixWebSocket<T> {
   private ws: WebSocket | null = null;
-  private url: string;
+  private basePath: string;
   private handlers: Set<MessageHandler<T>> = new Set();
   private statusHandlers: Set<StatusHandler> = new Set();
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
@@ -22,7 +22,13 @@ class AlertixWebSocket<T> {
   private _status: WsStatus = "disconnected";
 
   constructor(path: string) {
-    this.url = `${WS_BASE}${path}`;
+    this.basePath = path;
+  }
+
+  private buildUrl(): string {
+    const token = localStorage.getItem("alertix_token");
+    const sep = this.basePath.includes("?") ? "&" : "?";
+    return `${WS_BASE}${this.basePath}${token ? `${sep}token=${encodeURIComponent(token)}` : ""}`;
   }
 
   get status(): WsStatus {
@@ -39,7 +45,7 @@ class AlertixWebSocket<T> {
     if (this.ws?.readyState === WebSocket.OPEN) return;
 
     this.setStatus("connecting");
-    this.ws = new WebSocket(this.url);
+    this.ws = new WebSocket(this.buildUrl());
 
     this.ws.onopen = () => {
       this.reconnectDelay = MIN_RECONNECT_MS; // reset backoff on success

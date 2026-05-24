@@ -69,10 +69,12 @@ class Settings(BaseSettings):
     damage_model_checkpoint: str = ""
     flood_lstm_checkpoint: str = ""
     flood_unet_checkpoint: str = ""
+    seismic_ae_checkpoint: str = ""
 
     # LLM (Phase 2)
     ollama_url: str = "http://localhost:11434"
     ollama_tunnel_url: str = ""
+    cerebras_api_key: str = ""
     groq_api_key: str = ""
     gemini_api_key: str = ""
 

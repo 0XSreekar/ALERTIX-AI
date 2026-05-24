@@ -1,3 +1,4 @@
+import asyncio
 import uuid
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -14,6 +15,7 @@ from starlette.responses import Response
 from app import __version__
 from app.config import get_settings
 from app.logging import configure_logging, get_logger
+from app.processing.worker import run_in_process
 from app.redis_client import close_redis
 from app.tasks.scheduler import start_scheduler, stop_scheduler
 
@@ -37,9 +39,15 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         )
 
     start_scheduler()
+    _worker_task = asyncio.create_task(run_in_process(), name="processing-worker")
 
     yield
 
+    _worker_task.cancel()
+    try:
+        await _worker_task
+    except asyncio.CancelledError:
+        pass
     stop_scheduler()
     await close_redis()
     log.info("alertix_shutdown")

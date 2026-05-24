@@ -1,4 +1,8 @@
-"""Google Gemini client (second fallback)."""
+"""Google Gemini client (third fallback in the ladder).
+
+Uses gemini-2.5-flash — Google's current free-tier flagship with a 1M-token
+context window and ~1,500 req/day on the free API key.
+"""
 
 from __future__ import annotations
 
@@ -7,7 +11,7 @@ import httpx
 from app.config import get_settings
 
 GEMINI_URL = (
-    "https://generativelanguage.googleapis.com/v1beta/models/" "gemini-1.5-flash:generateContent"
+    "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
 )
 
 

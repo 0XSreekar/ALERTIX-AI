@@ -6,12 +6,14 @@ import asyncio
 import json
 import time
 from dataclasses import asdict
+from datetime import UTC, datetime
 from typing import Any
 
 from redis.asyncio import Redis
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.db import async_session_factory
 from app.ingestion.common.stream import HAZARD_EVENTS_STREAM
 from app.logging import get_logger
 from app.processing.events import ProcessingEvent
@@ -150,6 +152,49 @@ class HazardConsumer:
                     "source_event_id": event.event_id,
                 },
             )
+            # Publish to Redis pub/sub — this is what WebSocket clients subscribe to
+            if self.redis is not None:
+                alert_msg = json.dumps({
+                    "id": str(alert_row.id),
+                    "hazard_type": event.hazard_type,
+                    "severity": event.alert_tier.value,
+                    "title": title,
+                    "explanation": explanation,
+                    "probability": event.risk_score,
+                    "created_at": datetime.now(UTC).isoformat(),
+                }, default=str)
+                await self.redis.publish("alerts:new", alert_msg)
+            # Generate LLM explanation asynchronously without blocking the pipeline
+            asyncio.create_task(self._generate_llm_explanation(str(alert_row.id), event))
+
+    async def _generate_llm_explanation(self, alert_id: str, event: ProcessingEvent) -> None:
+        """Background: call LLM provider and write explanation back to alerts row."""
+        try:
+            from app.llm import provider as llm_provider
+            from app.llm.prompts import get_template
+
+            template = get_template(event.hazard_type)
+            prompt = template.format(
+                event_json=json.dumps(event.raw_payload, default=str, indent=2)
+            )
+            explanation_text, provider_name = await llm_provider.generate(prompt)
+            if not explanation_text:
+                return
+            async with async_session_factory() as sess:
+                await sess.execute(
+                    text("""
+                        UPDATE alerts
+                        SET explanation = :exp,
+                            explanation_status = 'generated',
+                            explanation_lang = 'en'
+                        WHERE id = :id
+                    """),
+                    {"exp": explanation_text, "id": alert_id},
+                )
+                await sess.commit()
+            log.info("llm_explanation_written", alert_id=alert_id, provider=provider_name)
+        except Exception:
+            log.exception("llm_explanation_failed", alert_id=alert_id)
 
     async def move_to_retry(self, event: ProcessingEvent, reason: str) -> None:
         event.state = ProcessingState.RETRY
@@ -208,6 +253,21 @@ class HazardConsumer:
             await self.persist_state(event)
             self._advance(event, ProcessingState.STORED)
             await self.persist_state(event)
+            # Publish processed event to Redis pub/sub for WebSocket fan-out
+            if self.redis is not None:
+                event_msg = json.dumps({
+                    "id": event.event_id,
+                    "hazard_type": event.hazard_type,
+                    "source": event.source,
+                    "latitude": event.latitude,
+                    "longitude": event.longitude,
+                    "magnitude": event.magnitude,
+                    "depth_km": event.depth_km,
+                    "risk_score": event.risk_score,
+                    "occurred_at": event.timestamp.isoformat(),
+                    "metadata": event.raw_payload,
+                }, default=str)
+                await self.redis.publish(f"events:{event.hazard_type}", event_msg)
             metrics.record_success(self.consumer_name, (time.perf_counter() - started) * 1000.0)
             return event
         except ValidationError as exc:
@@ -249,6 +309,28 @@ class EarthquakeConsumer(HazardConsumer):
             raise ValidationError("earthquake magnitude missing")
         if event.magnitude < 0.0 or event.magnitude > 10.0:
             raise ValidationError("earthquake magnitude out of range")
+
+    async def process_event(self, event: ProcessingEvent) -> ProcessingEvent:
+        result = await super().process_event(event)
+        # Write ML-derived risk score back to events table as anomaly_score
+        if self.session is not None and result.event_id:
+            try:
+                await self.session.execute(
+                    text("""
+                        UPDATE events
+                        SET anomaly_score = :score, probability = :prob
+                        WHERE source = :source AND external_id = :ext_id
+                    """),
+                    {
+                        "score": result.risk_score,
+                        "prob": result.risk_score,
+                        "source": result.source,
+                        "ext_id": result.event_id,
+                    },
+                )
+            except Exception:
+                log.warning("earthquake_score_writeback_failed", event_id=result.event_id)
+        return result
 
 
 class FloodConsumer(HazardConsumer):

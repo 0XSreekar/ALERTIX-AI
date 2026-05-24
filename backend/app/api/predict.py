@@ -1,14 +1,18 @@
 """Prediction endpoints wired to statistical and ML-derived hazard intelligence."""
 
+import logging
 from datetime import UTC, datetime, timedelta
 
+import numpy as np
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import get_settings
 from app.db import get_session
 from app.ingestion.open_meteo import get_rainfall_forecast
 from app.ml.cyclone_track import extrapolate_track
+from app.ml.flood_lstm import FloodLSTM
 from app.ml.landslide_rules import evaluate as landslide_evaluate
 from app.ml.seismic_autoencoder import omori_aftershock_probability
 from app.ml.wildfire_cluster import cluster_hotspots
@@ -84,6 +88,28 @@ async def predict_earthquake(
     )
 
 
+_flood_lstm: FloodLSTM | None = None
+_flood_log = logging.getLogger(__name__)
+
+
+def _get_flood_lstm() -> FloodLSTM | None:
+    global _flood_lstm
+    if _flood_lstm is not None:
+        return _flood_lstm
+    checkpoint = get_settings().flood_lstm_checkpoint
+    if not checkpoint:
+        return None
+    try:
+        model = FloodLSTM(checkpoint=checkpoint)
+        if model.loaded:
+            _flood_lstm = model
+            _flood_log.info("flood_lstm_loaded checkpoint=%s", checkpoint)
+            return _flood_lstm
+    except Exception as exc:
+        _flood_log.warning("flood_lstm_load_failed: %s", exc)
+    return None
+
+
 @router.get("/flood", response_model=FloodPrediction)
 async def predict_flood(
     basin_id: str = Query(...),
@@ -106,7 +132,45 @@ async def predict_flood(
         {"basin": f"%{basin_id}%", "cutoff": datetime.now(UTC) - timedelta(days=7)},
     )
     rows = result.fetchall()
-    forecast: list[FloodForecastPoint] = []
+
+    basin_name = basin_id
+    if rows:
+        meta = rows[0].metadata or {}
+        basin_name = meta.get("basin") or meta.get("gauge_name") or basin_id
+
+    # Try FloodLSTM if checkpoint is configured and we have enough history
+    lstm = _get_flood_lstm()
+    if lstm is not None and len(rows) >= 7:
+        try:
+            history_rows = list(reversed(rows))[-7:]
+            history = np.array(
+                [[float(r.intensity or 0.0), float(r.intensity or 0.0)] for r in history_rows],
+                dtype=np.float32,
+            )
+            fc = lstm.predict(history)
+            forecast = [
+                FloodForecastPoint(hour=24, discharge_p10=round(fc.forecast_24h * 0.75, 3),
+                                   discharge_p50=round(fc.forecast_24h, 3),
+                                   discharge_p90=round(fc.forecast_24h * 1.25, 3)),
+                FloodForecastPoint(hour=48, discharge_p10=round(fc.forecast_48h * 0.75, 3),
+                                   discharge_p50=round(fc.forecast_48h, 3),
+                                   discharge_p90=round(fc.forecast_48h * 1.25, 3)),
+                FloodForecastPoint(hour=72, discharge_p10=round(fc.forecast_72h * 0.75, 3),
+                                   discharge_p50=round(fc.forecast_72h, 3),
+                                   discharge_p90=round(fc.forecast_72h * 1.25, 3)),
+            ]
+            return FloodPrediction(
+                basin_id=basin_id,
+                basin_name=basin_name,
+                forecast=forecast,
+                official_bulletin_agrees=fc.risk_tier in ("HIGH", "CRITICAL"),
+                model_version="flood-lstm-v1",
+            )
+        except Exception as exc:
+            _flood_log.warning("flood_lstm_predict_failed basin=%s: %s", basin_id, exc)
+
+    # Fallback: passthrough CWC readings as forecast points
+    forecast = []
     for i, row in enumerate(reversed(rows)):
         value = float(row.intensity or 0.0)
         forecast.append(
@@ -117,10 +181,6 @@ async def predict_flood(
                 discharge_p90=round(value * 1.3, 2),
             )
         )
-    basin_name = basin_id
-    if rows:
-        meta = rows[0].metadata or {}
-        basin_name = meta.get("basin") or meta.get("gauge_name") or basin_id
     return FloodPrediction(
         basin_id=basin_id,
         basin_name=basin_name,
