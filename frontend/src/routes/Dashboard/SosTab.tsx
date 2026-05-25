@@ -28,7 +28,10 @@ export default function SosTab() {
     queryFn: fetchMySos,
   });
 
-  const uploadFileWithProgress = (f: File): Promise<string | null> => {
+  const [errorDetail, setErrorDetail] = useState("");
+
+  /** Upload file against an existing SOS report (post-create). */
+  const uploadAttachmentWithProgress = (sosId: string, f: File): Promise<void> => {
     return new Promise((resolve, reject) => {
       const token = getAuthToken();
       const xhr = new XMLHttpRequest();
@@ -43,20 +46,15 @@ export default function SosTab() {
 
       xhr.onload = () => {
         if (xhr.status >= 200 && xhr.status < 300) {
-          try {
-            const res = JSON.parse(xhr.responseText) as { url?: string };
-            resolve(res.url ?? null);
-          } catch {
-            resolve(null);
-          }
+          resolve();
         } else {
-          reject(new Error(`Upload failed: ${xhr.status}`));
+          reject(new Error(`HTTP ${xhr.status}: ${xhr.responseText.slice(0, 200)}`));
         }
       };
 
       xhr.onerror = () => reject(new Error("Upload network error"));
 
-      xhr.open("POST", `${BASE}/api/sos/upload`);
+      xhr.open("POST", `${BASE}/api/sos/mine/${sosId}/attachment`);
       if (token) xhr.setRequestHeader("Authorization", `Bearer ${token}`);
       xhr.send(form);
     });
@@ -67,17 +65,10 @@ export default function SosTab() {
     if (!consent) return;
 
     setStatus("idle");
+    setErrorDetail("");
     setUploadProgress(0);
 
-    let mediaUrl: string | null = null;
-
     try {
-      if (file) {
-        setStatus("uploading");
-        mediaUrl = await uploadFileWithProgress(file);
-        setUploadProgress(100);
-      }
-
       setStatus("sending");
 
       const token = getAuthToken();
@@ -86,7 +77,6 @@ export default function SosTab() {
         latitude: lat ? parseFloat(lat) : undefined,
         longitude: lon ? parseFloat(lon) : undefined,
         consent_given: true,
-        ...(mediaUrl ? { media_url: mediaUrl } : {}),
       };
 
       const res = await fetch(`${BASE}/api/sos`, {
@@ -98,7 +88,31 @@ export default function SosTab() {
         body: JSON.stringify(body),
       });
 
-      if (!res.ok) throw new Error(`SOS submit failed: ${res.status}`);
+      if (!res.ok) {
+        const errText = await res.text();
+        let detail = `HTTP ${res.status}`;
+        try {
+          const j = JSON.parse(errText) as { detail?: string };
+          if (j.detail) detail = j.detail;
+        } catch {
+          if (errText) detail += `: ${errText.slice(0, 200)}`;
+        }
+        throw new Error(detail);
+      }
+
+      const created = (await res.json()) as { id: string };
+
+      // If there's a file attached, upload it as an attachment against the new report.
+      // We deliberately don't fail the whole submission if attachment fails.
+      if (file && created.id) {
+        try {
+          setStatus("uploading");
+          await uploadAttachmentWithProgress(created.id, file);
+          setUploadProgress(100);
+        } catch (attachErr) {
+          setErrorDetail(`Report saved, but attachment failed: ${attachErr}`);
+        }
+      }
 
       setStatus("sent");
       setText("");
@@ -109,8 +123,9 @@ export default function SosTab() {
       setUploadProgress(0);
       if (fileInputRef.current) fileInputRef.current.value = "";
       void refetch();
-    } catch {
+    } catch (err) {
       setStatus("error");
+      setErrorDetail(String(err instanceof Error ? err.message : err));
     }
   };
 
@@ -124,6 +139,18 @@ export default function SosTab() {
   return (
     <div className="space-y-6">
       <h2 className="text-2xl font-bold">SOS Reports</h2>
+
+      <div className="rounded-md border border-cyan-700/30 bg-cyan-950/20 p-3 text-xs text-cyan-100">
+        <p className="mb-1 font-semibold uppercase tracking-wider text-cyan-300">
+          Where does this report go?
+        </p>
+        <ul className="ml-4 list-disc space-y-0.5 text-cyan-50/80">
+          <li>Saved to the secure <code className="rounded bg-cyan-900/40 px-1">sos_reports</code> table with your user ID, GPS (if shared), and consent timestamp.</li>
+          <li>Auto-enriched within seconds: language detected → translated → place names extracted → geocoded → urgency triaged (1–5) via LLM.</li>
+          <li>Officials/admins see urgency-ranked submissions on the <strong>Triaged Feed</strong> (this dashboard, role-gated).</li>
+          <li>You will see your own submissions below under <strong>My Reports</strong>, including triage status and AI summary.</li>
+        </ul>
+      </div>
 
       <Card>
         <CardHeader>
@@ -208,7 +235,14 @@ export default function SosTab() {
               <p className="text-sm text-green-400">Report submitted. Stay safe.</p>
             )}
             {status === "error" && (
-              <p className="text-sm text-red-400">Failed to submit. Try again.</p>
+              <div className="rounded-md border border-red-800/50 bg-red-950/30 p-2 text-sm text-red-300">
+                <p className="font-medium">Failed to submit.</p>
+                {errorDetail && (
+                  <p className="mt-1 break-words font-mono text-[11px] opacity-80">
+                    {errorDetail}
+                  </p>
+                )}
+              </div>
             )}
           </form>
         </CardContent>

@@ -115,8 +115,18 @@ async def _run_sos_enrichment(sos_id: str, raw_text: str, has_user_location: boo
         log.exception("sos_enrichment_failed", sos_id=sos_id)
 
 
+def _rate_key(request: Request) -> str:
+    """Per-user limit when authenticated, per-IP for anonymous."""
+    auth = request.headers.get("authorization", "")
+    if auth.lower().startswith("bearer "):
+        # crude but stable key without verifying the token; the auth dep below
+        # rejects bad tokens, so this is only used for distinct buckets
+        return f"user:{auth[7:][-32:]}"
+    return get_remote_address(request)
+
+
 @router.post("")
-@limiter.limit("5/hour")
+@limiter.limit("30/hour", key_func=_rate_key)
 async def submit_sos(
     request: Request,
     body: SosCreate,
