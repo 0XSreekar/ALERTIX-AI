@@ -101,27 +101,47 @@ Frontend env vars must be prefixed with `VITE_`.
 
 ## Phase 3 — Sentinel "Live Threat Theatre"
 
-Single flagship feature replacing the feel of "another dashboard tab." Lives at
-`/dashboard/sentinel`. Active development; not all components are complete.
+Flagship feature at `/dashboard/sentinel` (the dashboard's default landing tab).
+**All 9 components shipped and merged into `main`.**
 
-**Components (each gated by a feature flag; build them in this order):**
+**Layout:** Header (LIVE/REPLAY badge + real-vs-demo event counter + critical
+count) → time slider (-7d to +72h, gradient track, NOW marker) → main row
+(real Earth globe left, top-threats list right) → tabbed panel (`💬 Ask AI` |
+`🔗 Cascading hazards` | `📊 Statistics`) → slide-in SitRep panel on click.
 
-| # | Component | Backend | Frontend | Status |
-|---|---|---|---|---|
-| 1 | 3D India globe (Three.js / R3F) | — | `routes/Dashboard/SentinelTab.tsx`, `components/sentinel/Globe.tsx` | building |
-| 2 | Live event particles over WS | reuses `/ws/events` | particle system inside Globe | building |
-| 3 | Top-threats sidebar | `GET /api/sentinel/threats` | `components/sentinel/ThreatList.tsx` | building |
-| 4 | Time slider (-7d → +72h) | reuses `/api/events` with `from`/`to` | `components/sentinel/TimeSlider.tsx` | building |
-| 5 | Forecast cones (cyclone, flood, seismic) | reuses `/api/predict/*` | overlay layer in Globe | pending |
-| 6 | WorldPop population-at-risk | `GET /api/sentinel/impact?event_id=` | drill-down panel | pending |
-| 7 | AI Briefing Bar (Gemini RAG, grounded only on visible events) | `POST /api/sentinel/brief` | `components/sentinel/BriefingBar.tsx` | building |
-| 8 | Cascading hazard graph (force-directed) | `GET /api/sentinel/cascades` | `components/sentinel/CascadeGraph.tsx` | pending |
-| 9 | Drill-down SitRep panel (Gemini-generated, citation-linked) | `POST /api/sentinel/sitrep` | `components/sentinel/SitRepPanel.tsx` | pending |
+**Backend endpoints (`backend/app/api/sentinel.py`):**
 
-**Accuracy constraint:** every particle, cone, and number on this surface MUST trace
-to a real DB row or a model we've trained. No demo bezels, no fabricated populations.
-The AI briefing prompt always passes the on-screen event payload as context — Gemini
-must cite event IDs in its response; ungrounded answers are rejected by the frontend.
+| Endpoint | Purpose |
+|---|---|
+| `GET /api/sentinel/threats` | Top-N live hazards ranked by composite threat score |
+| `GET /api/sentinel/stream?from=&to=` | Compact event payload for the globe particle layer; supports time scrubbing |
+| `GET /api/sentinel/forecasts` | Cyclone 24h tracks (extrapolate_track) + earthquake/flood warning halos with computed radii |
+| `GET /api/sentinel/impact?event_id=` | Population at risk inside the warning radius (Indian city census table at `backend/app/sentinel/population.py`, 80 cities, 2024 projected) |
+| `POST /api/sentinel/brief` | RAG-grounded AI Q&A; prompt carries the visible event payload + each event's `source` so the LLM can flag synthetic vs real data |
+| `POST /api/sentinel/sitrep` | Per-event 4-section Markdown SitRep (Situation / Population & Infra / Recommended Actions / Confidence). For `source=demo_seed` events the prompt forces a `⚠ DEMO EVENT` disclaimer and reframes as illustrative |
+| `GET /api/sentinel/cascades` | Spatio-temporal cascade graph; edges link events within `(max_distance_km, hours)` AND a plausible cascade type (cyclone→flood, eq→landslide, …) |
+
+**Frontend (`frontend/src/components/sentinel/`):** `Globe.tsx` (R3F, real NASA
+Blue Marble + bump + spec + night-lights textures in `public/textures/`,
+atmosphere fresnel shader, camera fly-to on selection, billboarded tactical
+markers), `ThreatList.tsx`, `TimeSlider.tsx`, `BriefingBar.tsx`,
+`SitRepPanel.tsx`, `CascadeGraph.tsx` (pure-SVG force-directed, no D3 dep),
+`StatsPanel.tsx`.
+
+**Integrity rules — never relax these:**
+- Every particle and number must trace to a real DB row or a model checkpoint.
+- `events.source` is part of every Sentinel payload. `source='demo_seed'` events
+  (from `backend/scripts/seed_demo_events.py`) must render with a visible DEMO
+  chip in the list, a dashed yellow outer ring on the globe, and a top-line
+  `⚠ DEMO EVENT` banner in the SitRep panel. The LLM prompts get `src=...` so
+  the answer surfaces the same caveat.
+- The AI briefing prompt always carries the visible event payload as context.
+  The LLM must cite event IDs as `[evt-XXXX]`; ungrounded answers are rejected.
+
+**Current data caveats:** USGS earthquake ingestion is live. IMD/CWC scrapers
+need fixing (currently parse 0 rows or 500-error). FIRMS/Sentinel need API keys
+in `.env`. Until those land, most Sentinel content outside the earthquake layer
+is `demo_seed`; the DEMO chips/banners exist precisely to keep this honest.
 
 ## External data sources
 
