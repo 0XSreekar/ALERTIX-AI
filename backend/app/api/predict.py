@@ -418,6 +418,25 @@ async def predict_risk(
     )
 
 
+_TECTONIC_BANDS: list[tuple[float, float, float, float, float]] = [
+    # (min_lat, max_lat, min_lon, max_lon, baseline_risk 0-1)
+    (28.0, 37.0, 73.0, 97.5, 0.55),  # Himalayan seismic + landslide belt
+    (24.0, 28.0, 70.0, 97.5, 0.35),  # Indo-Gangetic + sub-Himalayan
+    (8.0, 21.0, 72.0, 78.0, 0.30),  # Western Ghats / Konkan (monsoon flood)
+    (8.0, 14.0, 76.0, 80.5, 0.25),  # Kerala / Tamil Nadu
+    (14.0, 22.0, 80.0, 88.5, 0.25),  # East coast cyclone strip
+    (20.0, 24.0, 84.0, 88.5, 0.30),  # Odisha / Bengal delta
+    (23.0, 28.0, 88.0, 97.5, 0.45),  # NE India (landslide + flood)
+]
+
+
+def _baseline_risk(lat: float, lon: float) -> float:
+    for min_lat, max_lat, min_lon, max_lon, base in _TECTONIC_BANDS:
+        if min_lat <= lat <= max_lat and min_lon <= lon <= max_lon:
+            return base
+    return 0.10  # peninsular interior — low baseline
+
+
 @router.get("/risk/grid", response_model=RiskGridResponse)
 async def predict_risk_grid(
     minlat: float = Query(6.0, ge=-90, le=90),
@@ -427,93 +446,89 @@ async def predict_risk_grid(
     step_deg: float = Query(2.0, ge=0.5, le=10.0),
     session: AsyncSession = Depends(get_session),
 ) -> RiskGridResponse:
-    """Coarse risk grid over a bbox (default: India). Skips per-cell rainfall
-    lookup for speed; relies on cached event tables only."""
+    """Coarse risk grid over a bbox (default: India).
+
+    Implementation: one SQL aggregation per hazard type that snaps event
+    locations to the grid via ST_SnapToGrid, then composites with a tectonic
+    baseline so the heatmap is always visible even when ingestion is sparse.
+    """
     radius_km = max(step_deg * 60.0, 60.0)
-    radius_m = radius_km * 1000
     now = datetime.now(UTC)
-    cutoff_30d = now - timedelta(days=30)
-    cutoff_3d = now - timedelta(days=3)
-    cutoff_24h = now - timedelta(hours=24)
-    cutoff_48h = now - timedelta(hours=48)
+
+    # Single round-trip per hazard type using ST_SnapToGrid.
+    async def _bucketed(
+        hazard: str, since: datetime, value_expr: str
+    ) -> dict[tuple[float, float], float]:
+        rows = (
+            await session.execute(
+                text(f"""
+                    SELECT
+                        ST_Y(ST_SnapToGrid(location::geometry, :step)) AS gy,
+                        ST_X(ST_SnapToGrid(location::geometry, :step)) AS gx,
+                        {value_expr} AS v
+                    FROM events
+                    WHERE hazard_type = :hazard
+                      AND occurred_at >= :since
+                      AND location IS NOT NULL
+                      AND ST_Y(location::geometry) BETWEEN :minlat AND :maxlat
+                      AND ST_X(location::geometry) BETWEEN :minlon AND :maxlon
+                    GROUP BY gy, gx
+                """),
+                {
+                    "step": step_deg,
+                    "hazard": hazard,
+                    "since": since,
+                    "minlat": minlat,
+                    "maxlat": maxlat,
+                    "minlon": minlon,
+                    "maxlon": maxlon,
+                },
+            )
+        ).fetchall()
+        return {(round(r.gy, 4), round(r.gx, 4)): float(r.v or 0) for r in rows}
+
+    eq_count = await _bucketed("earthquake", now - timedelta(days=30), "count(*)")
+    eq_max = await _bucketed("earthquake", now - timedelta(days=30), "COALESCE(max(magnitude), 0)")
+    fl_max = await _bucketed("flood", now - timedelta(days=3), "COALESCE(max(intensity), 0)")
+    wf_count = await _bucketed("wildfire", now - timedelta(hours=24), "count(*)")
+    cy_max = await _bucketed(
+        "cyclone",
+        now - timedelta(hours=48),
+        "COALESCE(max((metadata->>'wind_kmh')::float), 0)",
+    )
 
     cells: list[RiskGridCell] = []
     lat = minlat
-    while lat <= maxlat:
+    while lat <= maxlat + 1e-6:
         lon = minlon
-        while lon <= maxlon:
-            eq = (
-                await session.execute(
-                    text("""
-                        SELECT count(*) AS cnt, COALESCE(max(magnitude), 0) AS mx
-                        FROM events
-                        WHERE hazard_type = 'earthquake'
-                          AND occurred_at >= :cutoff
-                          AND ST_DWithin(location,
-                              ST_SetSRID(ST_MakePoint(:lon, :lat), 4326)::geography, :r)
-                    """),
-                    {"lon": lon, "lat": lat, "r": radius_m, "cutoff": cutoff_30d},
-                )
-            ).fetchone()
-            fl = (
-                await session.execute(
-                    text("""
-                        SELECT COALESCE(max(intensity), 0) AS mx FROM events
-                        WHERE hazard_type = 'flood' AND occurred_at >= :cutoff
-                          AND ST_DWithin(location,
-                              ST_SetSRID(ST_MakePoint(:lon, :lat), 4326)::geography, :r)
-                    """),
-                    {"lon": lon, "lat": lat, "r": radius_m, "cutoff": cutoff_3d},
-                )
-            ).fetchone()
-            wf = (
-                await session.execute(
-                    text("""
-                        SELECT count(*) AS cnt FROM events
-                        WHERE hazard_type = 'wildfire' AND occurred_at >= :cutoff
-                          AND ST_DWithin(location,
-                              ST_SetSRID(ST_MakePoint(:lon, :lat), 4326)::geography, :r)
-                    """),
-                    {"lon": lon, "lat": lat, "r": radius_m, "cutoff": cutoff_24h},
-                )
-            ).fetchone()
-            cy = (
-                await session.execute(
-                    text("""
-                        SELECT COALESCE(max((metadata->>'wind_kmh')::float), 0) AS mx
-                        FROM events WHERE hazard_type = 'cyclone'
-                          AND occurred_at >= :cutoff
-                          AND ST_DWithin(location,
-                              ST_SetSRID(ST_MakePoint(:lon, :lat), 4326)::geography, :r)
-                    """),
-                    {"lon": lon, "lat": lat, "r": radius_m, "cutoff": cutoff_48h},
-                )
-            ).fetchone()
-
+        while lon <= maxlon + 1e-6:
+            key = (round(lat, 4), round(lon, 4))
             feats = {
-                "eq_count_30d": float(eq.cnt or 0),
-                "eq_max_magnitude": float(eq.mx or 0),
-                "flood_max_intensity": float(fl.mx or 0),
+                "eq_count_30d": eq_count.get(key, 0.0),
+                "eq_max_magnitude": eq_max.get(key, 0.0),
+                "flood_max_intensity": fl_max.get(key, 0.0),
                 "rainfall_72h_mm": 0.0,
-                "wildfire_count_24h": float(wf.cnt or 0),
-                "cyclone_wind_kmh": float(cy.mx or 0),
+                "wildfire_count_24h": wf_count.get(key, 0.0),
+                "cyclone_wind_kmh": cy_max.get(key, 0.0),
                 "landslide_rule_score": 0.0,
             }
-            raw = risk_index_score(feats)
-            if raw < 0:
-                # XGBoost weights missing — derive a heuristic so grid is non-empty
-                raw = min(
-                    1.0,
-                    feats["eq_max_magnitude"] / 8.0 * 0.4
-                    + min(feats["eq_count_30d"], 30) / 30.0 * 0.2
-                    + feats["flood_max_intensity"] / 5.0 * 0.2
-                    + min(feats["wildfire_count_24h"], 50) / 50.0 * 0.1
-                    + feats["cyclone_wind_kmh"] / 220.0 * 0.1,
-                )
-            if raw > 0.02:
-                cells.append(
-                    RiskGridCell(lat=lat, lon=lon, risk_index=round(raw, 3), tier=_risk_tier(raw))
-                )
+            event_signal = min(
+                1.0,
+                feats["eq_max_magnitude"] / 8.0 * 0.4
+                + min(feats["eq_count_30d"], 30) / 30.0 * 0.2
+                + feats["flood_max_intensity"] / 5.0 * 0.2
+                + min(feats["wildfire_count_24h"], 50) / 50.0 * 0.1
+                + feats["cyclone_wind_kmh"] / 220.0 * 0.1,
+            )
+            xgb = risk_index_score(feats)
+            if xgb >= 0:
+                event_signal = max(event_signal, xgb)
+            # Composite: blend baseline (tectonic/climatic) with live event signal.
+            baseline = _baseline_risk(lat, lon)
+            raw = min(1.0, baseline + event_signal * (1.0 - baseline))
+            cells.append(
+                RiskGridCell(lat=lat, lon=lon, risk_index=round(raw, 3), tier=_risk_tier(raw))
+            )
             lon += step_deg
         lat += step_deg
 
