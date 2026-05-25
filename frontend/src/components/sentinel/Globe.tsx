@@ -46,24 +46,42 @@ function severity(e: SentinelStreamEvent): number {
 
 function Earth() {
   const meshRef = useRef<THREE.Mesh>(null);
+  // Subtle wireframe-style inner sphere; particles ride a glass-like outer shell
   useFrame((_s, delta) => {
-    if (meshRef.current) meshRef.current.rotation.y += delta * 0.02;
+    if (meshRef.current) meshRef.current.rotation.y += delta * 0.015;
   });
   return (
     <group>
-      <mesh ref={meshRef}>
-        <sphereGeometry args={[RADIUS, 96, 96]} />
+      {/* Solid core */}
+      <mesh>
+        <sphereGeometry args={[RADIUS * 0.98, 64, 64]} />
         <meshPhongMaterial
-          color="#0b1c2c"
-          emissive="#08111a"
-          emissiveIntensity={0.6}
-          shininess={4}
-          specular={new THREE.Color("#1f3a5f")}
+          color="#0f2238"
+          emissive="#0c1a2c"
+          emissiveIntensity={0.5}
+          shininess={20}
+          specular={new THREE.Color("#3b82f6")}
         />
       </mesh>
+      {/* Wireframe overlay — gives it ops-room feel */}
+      <mesh ref={meshRef}>
+        <sphereGeometry args={[RADIUS, 28, 20]} />
+        <meshBasicMaterial
+          color="#1e3a5f"
+          wireframe
+          transparent
+          opacity={0.45}
+        />
+      </mesh>
+      {/* Inner soft glow */}
       <mesh>
-        <sphereGeometry args={[RADIUS * 1.04, 64, 64]} />
-        <meshBasicMaterial color="#3b82f6" transparent opacity={0.07} side={THREE.BackSide} />
+        <sphereGeometry args={[RADIUS * 1.02, 48, 48]} />
+        <meshBasicMaterial color="#22d3ee" transparent opacity={0.04} side={THREE.BackSide} />
+      </mesh>
+      {/* Outer halo */}
+      <mesh>
+        <sphereGeometry args={[RADIUS * 1.08, 48, 48]} />
+        <meshBasicMaterial color="#3b82f6" transparent opacity={0.06} side={THREE.BackSide} />
       </mesh>
     </group>
   );
@@ -258,7 +276,7 @@ export default function Globe({
   halos = [],
   autoRotate = true,
 }: GlobeProps) {
-  const indiaCam = useMemo(() => latLonToVec3(22, 80, RADIUS * 2.6), []);
+  const indiaCam = useMemo(() => latLonToVec3(18, 82, RADIUS * 2.1), []);
   const controlsRef = useRef<{ target: THREE.Vector3; update: () => void } | null>(null);
 
   const flyTarget = useMemo<[number, number, number] | null>(() => {

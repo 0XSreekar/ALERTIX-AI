@@ -111,8 +111,8 @@ interface Props {
 }
 
 export default function CascadeGraph({ graph, selectedId, onSelect }: Props) {
-  const WIDTH = 720;
-  const HEIGHT = 360;
+  const WIDTH = 560;
+  const HEIGHT = 320;
   const [hoverEdge, setHoverEdge] = useState<string | null>(null);
 
   const positioned = useMemo(() => {
@@ -133,25 +133,31 @@ export default function CascadeGraph({ graph, selectedId, onSelect }: Props) {
 
   if (!graph || positioned.length === 0) {
     return (
-      <div className="flex h-48 items-center justify-center rounded-lg border border-border bg-background/30 text-xs text-muted-foreground">
+      <div className="flex h-[360px] items-center justify-center rounded-xl border border-border/60 bg-card/40 text-xs text-muted-foreground backdrop-blur">
         No cascading hazards detected in the current window.
       </div>
     );
   }
 
   return (
-    <div className="rounded-lg border border-border bg-gradient-to-br from-slate-950 to-slate-900 p-2">
-      <div className="mb-2 flex items-center justify-between px-2">
-        <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-          Cascading Hazards
-        </h3>
-        <span className="text-[10px] text-muted-foreground">
-          {positioned.length} nodes · {graph.edges.length} edges · last {graph.window_hours}h
+    <div className="overflow-hidden rounded-xl border border-border/60 bg-gradient-to-br from-slate-950/80 to-slate-900/80 backdrop-blur">
+      <div className="flex items-baseline justify-between border-b border-border/40 px-4 py-3">
+        <div>
+          <h3 className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+            Cascading hazards
+          </h3>
+          <p className="mt-0.5 text-[10px] text-muted-foreground/70">
+            Events linked by spatio-temporal proximity + plausible mechanism
+          </p>
+        </div>
+        <span className="font-mono text-[10px] text-muted-foreground">
+          {positioned.length} nodes · {graph.edges.length} edges · {graph.window_hours}h
         </span>
       </div>
       <svg
         viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
-        className="block h-auto w-full"
+        preserveAspectRatio="xMidYMid meet"
+        className="block h-[320px] w-full"
         role="img"
         aria-label="Cascading hazard graph"
       >
