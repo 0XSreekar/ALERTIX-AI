@@ -199,6 +199,85 @@ export interface SentinelBriefingResponse {
   context_events: number;
 }
 
+export interface SentinelImpactCity {
+  name: string;
+  state: string;
+  population_thousand: number;
+  distance_km: number;
+  lat: number;
+  lon: number;
+}
+
+export interface SentinelImpact {
+  event_id: string;
+  hazard_type: string;
+  center: { lat: number; lon: number };
+  radius_km: number;
+  population_at_risk_thousand: number;
+  city_count: number;
+  cities: SentinelImpactCity[];
+  estimate_note: string;
+}
+
+export interface SentinelSitRep {
+  event_id: string;
+  short_id: string;
+  sitrep_markdown: string;
+  provider: string;
+  audience: string;
+  impact_population_thousand: number;
+  impact_radius_km: number;
+  city_count: number;
+}
+
+export interface SentinelCycloneForecast {
+  event_id: string;
+  current: { lat: number; lon: number };
+  track: { lat: number; lon: number; t_plus_h: number }[];
+  impact_radius_km: number;
+  title: string;
+}
+
+export interface SentinelHazardHalo {
+  event_id: string;
+  hazard_type: string;
+  lat: number;
+  lon: number;
+  radius_km: number;
+  magnitude: number | null;
+  intensity: number | null;
+}
+
+export interface SentinelForecasts {
+  cyclones: SentinelCycloneForecast[];
+  halos: SentinelHazardHalo[];
+  window_minutes: number;
+}
+
+export interface SentinelCascadeNode {
+  id: string;
+  hazard_type: string;
+  lat: number;
+  lon: number;
+  occurred_at: string | null;
+  title: string;
+}
+
+export interface SentinelCascadeEdge {
+  source: string;
+  target: string;
+  label: string;
+  distance_km: number;
+  delta_hours: number;
+  weight: number;
+}
+
+export interface SentinelCascadeGraph {
+  nodes: SentinelCascadeNode[];
+  edges: SentinelCascadeEdge[];
+  window_hours: number;
+}
+
 export interface RiskGridCell {
   lat: number;
   lon: number;

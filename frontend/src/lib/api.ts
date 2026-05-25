@@ -8,6 +8,10 @@ import type {
   LandslidePrediction,
   RiskGridResponse,
   SentinelBriefingResponse,
+  SentinelCascadeGraph,
+  SentinelForecasts,
+  SentinelImpact,
+  SentinelSitRep,
   SentinelStreamResponse,
   SentinelThreat,
   SosReport,
@@ -159,6 +163,28 @@ export function postSentinelBriefing(question: string, eventIds: string[]) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ question, event_ids: eventIds }),
   });
+}
+
+export function fetchSentinelImpact(eventId: string) {
+  return apiFetch<SentinelImpact>(`/api/sentinel/impact?event_id=${eventId}`);
+}
+
+export function postSentinelSitRep(eventId: string, audience: "official" | "public" = "official") {
+  return apiFetch<SentinelSitRep>("/api/sentinel/sitrep", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ event_id: eventId, audience }),
+  });
+}
+
+export function fetchSentinelForecasts(minutes = 720) {
+  return apiFetch<SentinelForecasts>(`/api/sentinel/forecasts?minutes=${minutes}`);
+}
+
+export function fetchSentinelCascades(hours = 48, maxDistanceKm = 300) {
+  return apiFetch<SentinelCascadeGraph>(
+    `/api/sentinel/cascades?hours=${hours}&max_distance_km=${maxDistanceKm}`,
+  );
 }
 
 // ── Contact ─────────────────────────────────────────────────
