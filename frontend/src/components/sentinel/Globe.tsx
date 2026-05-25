@@ -143,7 +143,9 @@ function IndiaBoundsRing() {
   );
 }
 
-// ─── Event markers — vertical pin + glow ────────────────────────────────────
+// ─── Event markers — tactical-contact style ────────────────────────────────
+// Small filled centre + thin ring + pulse, oriented tangent to the globe.
+// No giant translucent blobs.
 
 interface EventPointProps {
   event: SentinelStreamEvent;
@@ -153,68 +155,126 @@ interface EventPointProps {
 
 function EventPoint({ event, selected, onSelect }: EventPointProps) {
   const surfacePos = useMemo(
-    () => latLonToVec3(event.lat, event.lon, RADIUS * 1.005),
+    () => new THREE.Vector3(...latLonToVec3(event.lat, event.lon, RADIUS * 1.005)),
     [event.lat, event.lon],
   );
-  const dir = useMemo(() => new THREE.Vector3(...surfacePos).normalize(), [surfacePos]);
-  const sev = severity(event);
-  const color = HAZARD_COLOR[event.hazard_type] ?? "#fde047";
-  const size = 0.018 + sev * 0.04 + (selected ? 0.012 : 0);
-  const pinHeight = 0.05 + sev * 0.16 + (selected ? 0.04 : 0);
-  // Pin endpoint above surface
-  const pinTip = useMemo(
-    () => dir.clone().multiplyScalar(RADIUS * 1.005 + pinHeight),
-    [dir, pinHeight],
-  );
-  const pinMid = useMemo(
-    () => dir.clone().multiplyScalar(RADIUS * 1.005 + pinHeight * 0.5),
-    [dir, pinHeight],
-  );
-  // Orient the pin cylinder so its Y-axis points along `dir`
-  const pinQuat = useMemo(() => {
+  const dir = useMemo(() => surfacePos.clone().normalize(), [surfacePos]);
+
+  // Quaternion to lay flat rings/discs onto the sphere surface
+  const tangentQuat = useMemo(() => {
     const q = new THREE.Quaternion();
-    q.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
+    q.setFromUnitVectors(new THREE.Vector3(0, 0, 1), dir);
     return q;
   }, [dir]);
 
-  const headRef = useRef<THREE.Mesh>(null);
+  const sev = severity(event);
+  const color = HAZARD_COLOR[event.hazard_type] ?? "#fde047";
+  const isDemo = event.source === "demo_seed";
+
+  // SMALL, fixed-ish marker sizes — severity only nudges the outer ring
+  const coreSize = selected ? 0.014 : 0.009;
+  const ringInner = 0.015 + sev * 0.012;
+  const ringOuter = ringInner + 0.004;
+  const pulseMax = 0.04 + sev * 0.04;
+
+  // Animated pulse — only the radius/opacity, not the marker itself
+  const pulseRef = useRef<THREE.Mesh>(null);
   useFrame(({ clock }) => {
-    if (!headRef.current) return;
-    const t = clock.elapsedTime * 2.2 + surfacePos[0];
-    const s = 1 + Math.sin(t) * 0.18 * (sev + 0.5);
-    headRef.current.scale.setScalar(s);
+    if (!pulseRef.current) return;
+    const t = (clock.elapsedTime * 0.8 + surfacePos.x) % 1;
+    const scale = 1 + t * (pulseMax / ringOuter - 1);
+    pulseRef.current.scale.set(scale, scale, scale);
+    const mat = pulseRef.current.material as THREE.MeshBasicMaterial;
+    mat.opacity = (1 - t) * 0.6 * (sev + 0.4);
   });
 
   return (
-    <group>
-      {/* Vertical pin shaft */}
-      <mesh position={pinMid} quaternion={pinQuat}>
-        <cylinderGeometry args={[0.003, 0.006, pinHeight, 8]} />
-        <meshBasicMaterial color={color} transparent opacity={0.85} />
+    <group position={surfacePos}>
+      {/* Pulse ring (animated) */}
+      <mesh ref={pulseRef} quaternion={tangentQuat}>
+        <ringGeometry args={[ringOuter, ringOuter + 0.0015, 32]} />
+        <meshBasicMaterial color={color} transparent opacity={0.6} side={THREE.DoubleSide} />
       </mesh>
-      {/* Pin head — clickable */}
+
+      {/* Static outer ring */}
+      <mesh quaternion={tangentQuat}>
+        <ringGeometry args={[ringInner, ringOuter, 32]} />
+        <meshBasicMaterial
+          color={color}
+          transparent
+          opacity={isDemo ? 0.65 : 0.95}
+          side={THREE.DoubleSide}
+        />
+      </mesh>
+
+      {/* Filled centre dot — invisible click target also lives here */}
       <mesh
-        ref={headRef}
-        position={pinTip}
+        quaternion={tangentQuat}
         onClick={(e: ThreeEvent<MouseEvent>) => {
           e.stopPropagation();
           onSelect();
         }}
+        onPointerOver={(e: ThreeEvent<PointerEvent>) => {
+          e.stopPropagation();
+          (e.object as THREE.Mesh).scale.setScalar(1.3);
+        }}
+        onPointerOut={(e: ThreeEvent<PointerEvent>) => {
+          (e.object as THREE.Mesh).scale.setScalar(1);
+        }}
       >
-        <sphereGeometry args={[size, 14, 14]} />
+        <circleGeometry args={[coreSize, 24]} />
         <meshBasicMaterial color={color} />
       </mesh>
-      {/* Halo around head */}
-      <mesh position={pinTip}>
-        <sphereGeometry args={[size * 2.6, 12, 12]} />
-        <meshBasicMaterial color={color} transparent opacity={0.22} />
-      </mesh>
-      {/* Selected ring */}
-      {selected && (
-        <mesh position={pinTip} quaternion={pinQuat}>
-          <torusGeometry args={[size * 3.2, size * 0.18, 8, 32]} />
-          <meshBasicMaterial color={color} transparent opacity={0.85} />
+
+      {/* Demo data dashed outer ring */}
+      {isDemo && (
+        <mesh quaternion={tangentQuat}>
+          <ringGeometry args={[ringOuter + 0.004, ringOuter + 0.006, 24]} />
+          <meshBasicMaterial
+            color="#facc15"
+            transparent
+            opacity={0.85}
+            side={THREE.DoubleSide}
+          />
         </mesh>
+      )}
+
+      {/* Selection crosshair */}
+      {selected && (
+        <>
+          <mesh quaternion={tangentQuat}>
+            <ringGeometry args={[ringOuter + 0.01, ringOuter + 0.012, 64]} />
+            <meshBasicMaterial color="#ffffff" transparent opacity={0.9} side={THREE.DoubleSide} />
+          </mesh>
+          {/* Crosshair ticks */}
+          {[0, 90, 180, 270].map((angle) => {
+            const rad = (angle * Math.PI) / 180;
+            const offset = ringOuter + 0.018;
+            const tickLen = 0.008;
+            const local = new THREE.Vector3(
+              Math.cos(rad) * offset,
+              Math.sin(rad) * offset,
+              0,
+            );
+            local.applyQuaternion(tangentQuat);
+            const local2 = new THREE.Vector3(
+              Math.cos(rad) * (offset - tickLen),
+              Math.sin(rad) * (offset - tickLen),
+              0,
+            );
+            local2.applyQuaternion(tangentQuat);
+            const geo = new THREE.BufferGeometry().setFromPoints([
+              surfacePos.clone().add(local).sub(surfacePos),
+              surfacePos.clone().add(local2).sub(surfacePos),
+            ]);
+            return (
+              <line key={angle}>
+                <primitive object={geo} attach="geometry" />
+                <lineBasicMaterial color="#ffffff" transparent opacity={0.8} />
+              </line>
+            );
+          })}
+        </>
       )}
     </group>
   );

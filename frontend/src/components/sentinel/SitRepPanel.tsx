@@ -111,6 +111,7 @@ export default function SitRepPanel({ event, onClose }: Props) {
     (event.meta as { place?: string }).place ??
     event.hazard_type;
   const popLakh = impact ? (impact.population_at_risk_thousand / 100).toFixed(1) : null;
+  const isDemo = event.source === "demo_seed";
 
   return (
     <aside
@@ -148,6 +149,22 @@ export default function SitRepPanel({ event, onClose }: Props) {
 
       {/* Body */}
       <div className="space-y-5 p-4">
+        {isDemo && (
+          <div className="rounded-lg border-2 border-yellow-500/60 bg-yellow-950/30 p-3">
+            <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-yellow-300">
+              <span className="text-base leading-none">⚠</span>
+              Demo event — not a real ongoing situation
+            </p>
+            <p className="mt-1 text-[11px] text-yellow-200/80">
+              This event came from <code className="rounded bg-yellow-900/40 px-1">backend/scripts/seed_demo_events.py</code>,
+              not from live ingestion (USGS, IMD, CWC, FIRMS…). All numbers, citizens,
+              and recommended actions below are illustrative only. To see real data,
+              wait for live USGS earthquake events, or configure NASA FIRMS / IMD keys
+              and re-run ingestion.
+            </p>
+          </div>
+        )}
+
         {/* Impact block */}
         <div className="rounded-lg border border-border bg-background/50 p-3">
           <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">

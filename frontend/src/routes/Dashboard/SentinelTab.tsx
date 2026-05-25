@@ -75,6 +75,7 @@ export default function SentinelTab() {
       .map((t) => ({
         id: t.id,
         hazard_type: t.hazard_type,
+        source: t.source,
         occurred_at: t.occurred_at,
         lat: t.latitude,
         lon: t.longitude,
@@ -104,6 +105,8 @@ export default function SentinelTab() {
   }, [threats, selectedId]);
 
   const critical = threats.filter((t) => t.threat_score >= 0.75).length;
+  const demoCount = allEventsOnGlobe.filter((e) => e.source === "demo_seed").length;
+  const realCount = allEventsOnGlobe.length - demoCount;
 
   return (
     <div className="space-y-4 pb-4">
@@ -135,9 +138,16 @@ export default function SentinelTab() {
         <div className="flex items-center gap-2 text-xs">
           <span className="rounded-md border border-border/60 bg-card/40 px-3 py-1.5">
             <span className="font-mono text-base font-bold tabular-nums text-foreground">
-              {allEventsOnGlobe.length}
+              {realCount}
             </span>{" "}
-            <span className="text-muted-foreground">events</span>
+            <span className="text-muted-foreground">real</span>
+            {demoCount > 0 && (
+              <>
+                {" + "}
+                <span className="font-mono font-bold text-yellow-300">{demoCount}</span>{" "}
+                <span className="text-yellow-300/80">demo</span>
+              </>
+            )}
           </span>
           {critical > 0 && (
             <span className="rounded-md border border-red-700/40 bg-red-950/30 px-3 py-1.5">

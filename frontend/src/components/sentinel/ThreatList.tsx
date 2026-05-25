@@ -86,6 +86,11 @@ export default function ThreatList({ threats, selectedId, onSelect }: Props) {
                   <span className="font-mono tabular-nums">
                     {t.latitude.toFixed(1)}, {t.longitude.toFixed(1)}
                   </span>
+                  {t.source === "demo_seed" && (
+                    <span className="ml-auto rounded bg-yellow-500/20 px-1.5 py-0 font-mono text-[9px] font-bold text-yellow-300">
+                      DEMO
+                    </span>
+                  )}
                 </div>
               </div>
             </button>

@@ -136,7 +136,7 @@ async def event_stream(
     rows = (
         await session.execute(
             text("""
-                SELECT id, hazard_type, occurred_at,
+                SELECT id, hazard_type, source, occurred_at,
                        ST_Y(location::geometry) AS lat,
                        ST_X(location::geometry) AS lon,
                        magnitude, intensity, metadata
@@ -158,6 +158,7 @@ async def event_stream(
             {
                 "id": str(r.id),
                 "hazard_type": r.hazard_type,
+                "source": r.source,
                 "occurred_at": r.occurred_at.isoformat() if r.occurred_at else None,
                 "lat": r.lat,
                 "lon": r.lon,
@@ -185,6 +186,11 @@ _BRIEF_PROMPT = """You are Alertix AI, a disaster intelligence assistant for Ind
 state Disaster Management Authorities. Answer the user's question using ONLY the
 events listed in the CONTEXT block. If the context does not contain enough
 information, say so explicitly — do not invent events.
+
+INTEGRITY: each event line carries a 'src' tag. If src=demo_seed the event is
+SYNTHETIC demo data — when you reference it, prefix the mention with '(demo)' so
+the reader knows it isn't a real ongoing observation. If src is anything else
+(usgs, firms, imd, cwc, etc.) treat it as a real observation.
 
 For every claim, cite the source event by its short ID in square brackets, like
 [evt-3f8b]. Keep the answer under 180 words. Bullet points are fine.
@@ -257,7 +263,8 @@ async def ai_briefing(
         meta = r.metadata or {}
         title = meta.get("title") or meta.get("place") or r.hazard_type
         ctx_lines.append(
-            f"[evt-{short}] {r.hazard_type} | when={r.occurred_at:%Y-%m-%d %H:%MZ} | "
+            f"[evt-{short}] {r.hazard_type} | src={r.source} | "
+            f"when={r.occurred_at:%Y-%m-%d %H:%MZ} | "
             f"loc=({r.lat:.2f},{r.lon:.2f}) | mag={r.magnitude} | "
             f"int={r.intensity} | {title}"
         )
@@ -381,6 +388,15 @@ class SitRepRequest(BaseModel):
 _SITREP_PROMPT = """You are a disaster intelligence analyst writing a situation report
 for {audience} stakeholders in India. Output a SitRep grounded ONLY in the structured
 event payload and impact data below. Do not invent additional events or numbers.
+
+IMPORTANT INTEGRITY RULES:
+- The EVENT field carries a 'source'. If source == 'demo_seed' the event is SYNTHETIC
+  demo data, not a real observation. In that case, open the report with a clearly
+  visible disclaimer line like "⚠ DEMO EVENT — not a real ongoing situation" and
+  frame all subsequent sentences as 'illustrative example of what a response would
+  look like', NOT as fact.
+- If the source is anything else (usgs, firms, imd, cwc, etc.) treat it as a real
+  observation but still flag uncertainty in the Confidence section.
 
 Return a 4-section report in Markdown:
 ## Situation

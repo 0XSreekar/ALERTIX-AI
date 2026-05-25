@@ -170,6 +170,7 @@ export interface SentinelThreat {
 export interface SentinelStreamEvent {
   id: string;
   hazard_type: string;
+  source?: string;
   occurred_at: string | null;
   lat: number;
   lon: number;
