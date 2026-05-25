@@ -85,6 +85,69 @@ export interface WildfirePrediction {
   total_hotspots: number;
 }
 
+export type DamageClass = "no_damage" | "minor" | "major" | "destroyed";
+
+export interface DamageBoundingBox {
+  label: string;
+  x_min: number;
+  y_min: number;
+  x_max: number;
+  y_max: number;
+}
+
+export interface DamageNearestEvent {
+  id: string;
+  hazard_type: string;
+  title: string | null;
+  distance_km: number;
+  occurred_at: string | null;
+}
+
+export interface DamageResult {
+  status: string;
+  report_id: string;
+  filename: string;
+  sha256: string;
+  image_url: string;
+  deduplicated: boolean;
+  class_label: DamageClass;
+  confidence: number;
+  class_probs: Record<DamageClass, number>;
+  bounding_boxes: DamageBoundingBox[];
+  mask_overlay: string;          // data URL
+  mask_shape: [number, number];
+  model_version: string;
+  latency_ms: number;
+  nearest_event: DamageNearestEvent | null;
+}
+
+export interface DamageReportSummary {
+  id: string;
+  class_label: DamageClass;
+  confidence: number;
+  class_probs: Record<DamageClass, number>;
+  latitude: number | null;
+  longitude: number | null;
+  model_version: string;
+  notes: string | null;
+  image_url: string;
+  created_at: string | null;
+}
+
+export const DAMAGE_COLORS: Record<DamageClass, string> = {
+  no_damage: "#22c55e",
+  minor: "#facc15",
+  major: "#f97316",
+  destroyed: "#ef4444",
+};
+
+export const DAMAGE_LABELS: Record<DamageClass, string> = {
+  no_damage: "No damage",
+  minor: "Minor",
+  major: "Major",
+  destroyed: "Destroyed",
+};
+
 export interface RiskGridCell {
   lat: number;
   lon: number;

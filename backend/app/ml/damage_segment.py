@@ -29,7 +29,9 @@ def _torch() -> Any:
 class DamagePrediction:
     class_label: str
     confidence: float
+    class_probs: dict[str, float]
     bounding_boxes: list[dict[str, float | str]]
+    mask: np.ndarray  # uint8 H×W, 0/1 — damaged-pixel mask at feature resolution
     latency_ms: float
 
 
@@ -155,7 +157,9 @@ class DamageSegmenter:
         return DamagePrediction(
             class_label=DAMAGE_CLASSES[class_idx],
             confidence=float(probs[class_idx]),
+            class_probs={DAMAGE_CLASSES[i]: float(probs[i]) for i in range(len(DAMAGE_CLASSES))},
             bounding_boxes=self._boxes_from_mask(mask),
+            mask=mask,
             latency_ms=latency_ms,
         )
 

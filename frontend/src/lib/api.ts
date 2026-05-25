@@ -1,5 +1,7 @@
 import type {
   Alert,
+  DamageReportSummary,
+  DamageResult,
   EarthquakePrediction,
   FloodPrediction,
   HazardEvent,
@@ -142,12 +144,35 @@ export function submitContact(body: { name: string; email: string; message: stri
 }
 
 // ── Damage ──────────────────────────────────────────────────
-export function uploadDamageImage(file: File) {
+export function uploadDamageImage(
+  file: File,
+  opts?: { latitude?: number; longitude?: number; notes?: string },
+) {
   const form = new FormData();
   form.append("file", file);
-  return apiFetch<{ status: string; classes: Record<string, number> }>("/api/damage/segment", {
+  if (opts?.latitude != null) form.append("latitude", String(opts.latitude));
+  if (opts?.longitude != null) form.append("longitude", String(opts.longitude));
+  if (opts?.notes) form.append("notes", opts.notes);
+  return apiFetch<DamageResult>("/api/damage/segment", {
     method: "POST",
     body: form,
+  });
+}
+
+export function fetchDamageReports(limit = 20) {
+  return apiFetch<{ reports: DamageReportSummary[] }>(`/api/damage/reports?limit=${limit}`);
+}
+
+export function damageImageUrl(reportId: string) {
+  return `${BASE}/api/damage/reports/${reportId}/image`;
+}
+
+export function damageImageBlob(reportId: string) {
+  return fetch(`${BASE}/api/damage/reports/${reportId}/image`, {
+    headers: authHeaders(),
+  }).then((r) => {
+    if (!r.ok) throw new Error(`Image ${r.status}`);
+    return r.blob();
   });
 }
 
