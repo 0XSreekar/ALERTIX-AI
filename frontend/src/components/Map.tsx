@@ -5,8 +5,9 @@ import "leaflet/dist/leaflet.css";
 import "leaflet.markercluster/dist/MarkerCluster.css";
 import "leaflet.markercluster/dist/MarkerCluster.Default.css";
 import "leaflet.markercluster";
-import type { HazardEvent } from "@/lib/types";
+import type { HazardEvent, RiskGridCell } from "@/lib/types";
 import { HAZARD_COLORS, type HazardType } from "@/lib/types";
+import { fetchRiskGrid } from "@/lib/api";
 
 // All known hazard types with display labels
 const HAZARD_TYPES: { type: HazardType; label: string; icon: string }[] = [
@@ -94,6 +95,142 @@ function ClusterLayer({ events, visibleTypes, onEventClick }: ClusterLayerProps)
       }
     };
   }, [map]);
+
+  return null;
+}
+
+// ─── Risk Index heatmap overlay ──────────────────────────────────────────────
+
+const RISK_COLORS: Record<string, string> = {
+  LOW: "#3b82f6",
+  MEDIUM: "#f59e0b",
+  HIGH: "#f97316",
+  CRITICAL: "#ef4444",
+};
+
+function RiskHeatLayer({ visible }: { visible: boolean }) {
+  const map = useMap();
+  const layerRef = useRef<L.LayerGroup | null>(null);
+  const [cells, setCells] = useState<RiskGridCell[]>([]);
+
+  useEffect(() => {
+    if (!visible) return;
+    let cancelled = false;
+    fetchRiskGrid()
+      .then((res) => {
+        if (!cancelled) setCells(res.cells);
+      })
+      .catch(() => {
+        if (!cancelled) setCells([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [visible]);
+
+  useEffect(() => {
+    if (!visible) {
+      if (layerRef.current) {
+        map.removeLayer(layerRef.current);
+        layerRef.current = null;
+      }
+      return;
+    }
+    if (!layerRef.current) {
+      layerRef.current = L.layerGroup().addTo(map);
+    }
+    const layer = layerRef.current;
+    layer.clearLayers();
+    cells.forEach((c) => {
+      const color = RISK_COLORS[c.tier] ?? RISK_COLORS.LOW;
+      L.circle([c.lat, c.lon], {
+        radius: 90_000,
+        color,
+        fillColor: color,
+        fillOpacity: Math.min(0.55, 0.15 + c.risk_index * 0.55),
+        weight: 0,
+        interactive: true,
+      })
+        .bindTooltip(
+          `Risk ${c.tier} · ${(c.risk_index * 100).toFixed(0)}%`,
+          { direction: "top" },
+        )
+        .addTo(layer);
+    });
+    return () => {
+      layer.clearLayers();
+    };
+  }, [cells, visible, map]);
+
+  useEffect(() => {
+    return () => {
+      if (layerRef.current) {
+        map.removeLayer(layerRef.current);
+        layerRef.current = null;
+      }
+    };
+  }, [map]);
+
+  return null;
+}
+
+// ─── GSI Landslide Zonation overlay ──────────────────────────────────────────
+
+const GSI_ZONE_COLORS: Record<string, string> = {
+  very_high: "#7c2d12",
+  high: "#a16207",
+  moderate: "#ca8a04",
+  low: "#65a30d",
+};
+
+function LandslideZonesLayer({ visible }: { visible: boolean }) {
+  const map = useMap();
+  const layerRef = useRef<L.GeoJSON | null>(null);
+  const dataRef = useRef<unknown>(null);
+
+  useEffect(() => {
+    if (!visible) {
+      if (layerRef.current) {
+        map.removeLayer(layerRef.current);
+        layerRef.current = null;
+      }
+      return;
+    }
+    const attach = (geojson: GeoJSON.FeatureCollection) => {
+      const layer = L.geoJSON(geojson, {
+        style: (feature) => {
+          const zone = (feature?.properties as { zone?: string } | undefined)?.zone ?? "low";
+          const color = GSI_ZONE_COLORS[zone] ?? GSI_ZONE_COLORS.low;
+          return { color, weight: 1, fillColor: color, fillOpacity: 0.18 };
+        },
+        onEachFeature: (feature, lyr) => {
+          const props = feature.properties as { name?: string; zone?: string };
+          lyr.bindTooltip(`${props.name ?? "Zone"} · ${props.zone ?? ""}`, { sticky: true });
+        },
+      }).addTo(map);
+      layerRef.current = layer;
+    };
+    if (dataRef.current) {
+      attach(dataRef.current as GeoJSON.FeatureCollection);
+      return;
+    }
+    let cancelled = false;
+    fetch("/data/landslide-zones.geojson")
+      .then((r) => r.json())
+      .then((g) => {
+        if (cancelled) return;
+        dataRef.current = g;
+        attach(g);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+      if (layerRef.current) {
+        map.removeLayer(layerRef.current);
+        layerRef.current = null;
+      }
+    };
+  }, [visible, map]);
 
   return null;
 }
@@ -204,6 +341,8 @@ export default function Map({
   const [visibleTypes, setVisibleTypes] = useState<Set<HazardType>>(
     new Set(HAZARD_TYPES.map((h) => h.type)),
   );
+  const [showRisk, setShowRisk] = useState(false);
+  const [showZones, setShowZones] = useState(false);
 
   const toggleType = (type: HazardType) => {
     setVisibleTypes((prev) => {
@@ -235,7 +374,33 @@ export default function Map({
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
         <ClusterLayer events={events} visibleTypes={visibleTypes} onEventClick={onEventClick} />
+        <RiskHeatLayer visible={showRisk} />
+        <LandslideZonesLayer visible={showZones} />
       </MapContainer>
+
+      {/* Overlay toggles (bottom-right) */}
+      <div className="absolute bottom-6 right-3 z-[1000] flex flex-col gap-2">
+        <button
+          onClick={() => setShowRisk((s) => !s)}
+          className={`rounded-lg border border-border px-3 py-1.5 text-xs font-medium shadow backdrop-blur-sm ${
+            showRisk
+              ? "bg-primary text-primary-foreground"
+              : "bg-background/90 text-foreground"
+          }`}
+        >
+          🔥 Risk Heatmap
+        </button>
+        <button
+          onClick={() => setShowZones((s) => !s)}
+          className={`rounded-lg border border-border px-3 py-1.5 text-xs font-medium shadow backdrop-blur-sm ${
+            showZones
+              ? "bg-primary text-primary-foreground"
+              : "bg-background/90 text-foreground"
+          }`}
+        >
+          ⛰️ Landslide Zones
+        </button>
+      </div>
 
       {/* Overlays rendered outside MapContainer so they aren't affected by Leaflet z-index */}
       <MapLegend visibleTypes={visibleTypes} onToggle={toggleType} />

@@ -1,0 +1,22 @@
+{
+  "type": "FeatureCollection",
+  "name": "gsi_landslide_susceptibility_india",
+  "description": "Approximate state-level landslide susceptibility (Geological Survey of India 1:50000 macro zonation, simplified). Use only for visualization — not a substitute for the official NLSM map.",
+  "features": [
+    {"type":"Feature","properties":{"name":"Uttarakhand","zone":"very_high"},"geometry":{"type":"Polygon","coordinates":[[[77.5,28.7],[81.0,28.7],[81.0,31.5],[77.5,31.5],[77.5,28.7]]]}},
+    {"type":"Feature","properties":{"name":"Himachal Pradesh","zone":"very_high"},"geometry":{"type":"Polygon","coordinates":[[[75.0,30.4],[79.5,30.4],[79.5,33.5],[75.0,33.5],[75.0,30.4]]]}},
+    {"type":"Feature","properties":{"name":"Jammu & Kashmir / Ladakh","zone":"very_high"},"geometry":{"type":"Polygon","coordinates":[[[73.5,32.0],[80.0,32.0],[80.0,37.1],[73.5,37.1],[73.5,32.0]]]}},
+    {"type":"Feature","properties":{"name":"Sikkim / Arunachal Pradesh","zone":"very_high"},"geometry":{"type":"Polygon","coordinates":[[[88.0,26.5],[97.5,26.5],[97.5,29.5],[88.0,29.5],[88.0,26.5]]]}},
+    {"type":"Feature","properties":{"name":"Assam / Meghalaya","zone":"very_high"},"geometry":{"type":"Polygon","coordinates":[[[89.5,24.0],[97.5,24.0],[97.5,28.3],[89.5,28.3],[89.5,24.0]]]}},
+    {"type":"Feature","properties":{"name":"Manipur / Mizoram","zone":"very_high"},"geometry":{"type":"Polygon","coordinates":[[[92.0,23.0],[96.5,23.0],[96.5,25.4],[92.0,25.4],[92.0,23.0]]]}},
+    {"type":"Feature","properties":{"name":"Nagaland / Tripura","zone":"very_high"},"geometry":{"type":"Polygon","coordinates":[[[93.0,25.0],[96.0,25.0],[96.0,27.5],[93.0,27.5],[93.0,25.0]]]}},
+    {"type":"Feature","properties":{"name":"Kerala (Western Ghats)","zone":"high"},"geometry":{"type":"Polygon","coordinates":[[[76.0,8.0],[77.5,8.0],[77.5,12.8],[76.0,12.8],[76.0,8.0]]]}},
+    {"type":"Feature","properties":{"name":"Maharashtra (Western Ghats)","zone":"high"},"geometry":{"type":"Polygon","coordinates":[[[73.0,15.0],[74.5,15.0],[74.5,22.0],[73.0,22.0],[73.0,15.0]]]}},
+    {"type":"Feature","properties":{"name":"Goa / Karnataka (Western Ghats)","zone":"high"},"geometry":{"type":"Polygon","coordinates":[[[74.0,12.0],[75.5,12.0],[75.5,15.5],[74.0,15.5],[74.0,12.0]]]}},
+    {"type":"Feature","properties":{"name":"Tamil Nadu (Nilgiris)","zone":"high"},"geometry":{"type":"Polygon","coordinates":[[[76.5,10.0],[78.0,10.0],[78.0,12.5],[76.5,12.5],[76.5,10.0]]]}},
+    {"type":"Feature","properties":{"name":"Jharkhand","zone":"moderate"},"geometry":{"type":"Polygon","coordinates":[[[84.0,21.0],[87.5,21.0],[87.5,25.5],[84.0,25.5],[84.0,21.0]]]}},
+    {"type":"Feature","properties":{"name":"West Bengal (Darjeeling)","zone":"moderate"},"geometry":{"type":"Polygon","coordinates":[[[85.0,21.5],[89.5,21.5],[89.5,27.5],[85.0,27.5],[85.0,21.5]]]}},
+    {"type":"Feature","properties":{"name":"Andhra Pradesh (Eastern Ghats)","zone":"moderate"},"geometry":{"type":"Polygon","coordinates":[[[77.0,13.5],[84.0,13.5],[84.0,19.5],[77.0,19.5],[77.0,13.5]]]}},
+    {"type":"Feature","properties":{"name":"Chhattisgarh / Odisha","zone":"moderate"},"geometry":{"type":"Polygon","coordinates":[[[80.0,20.0],[84.5,20.0],[84.5,24.5],[80.0,24.5],[80.0,20.0]]]}}
+  ]
+}

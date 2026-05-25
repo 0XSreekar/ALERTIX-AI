@@ -55,7 +55,7 @@ Rate the urgency 1-5 (5 = immediate life threat) and provide:
 4. recommended_action: one sentence on what responders should do
 
 Respond ONLY with valid JSON matching this schema:
-{"urgency_score": int, "category": str, "summary": str, "recommended_action": str}"""
+{{"urgency_score": int, "category": str, "summary": str, "recommended_action": str}}"""
 
 GENERIC_EXPLAIN = """You are Alertix AI, an Indian disaster-intelligence assistant.
 

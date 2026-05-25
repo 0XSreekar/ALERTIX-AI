@@ -4,6 +4,7 @@ import type {
   FloodPrediction,
   HazardEvent,
   LandslidePrediction,
+  RiskGridResponse,
   SosReport,
   WildfirePrediction,
 } from "./types";
@@ -110,6 +111,21 @@ export function fetchFloodPrediction(basinId: string) {
 
 export function fetchWildfirePrediction(bbox = "65,5,100,40") {
   return apiFetch<WildfirePrediction>(`/api/predict/wildfire?bbox=${bbox}`);
+}
+
+export function fetchRiskGrid(
+  bbox: [number, number, number, number] = [6, 68, 36, 98],
+  stepDeg = 2.0,
+) {
+  const [minlat, minlon, maxlat, maxlon] = bbox;
+  const qs = new URLSearchParams({
+    minlat: String(minlat),
+    minlon: String(minlon),
+    maxlat: String(maxlat),
+    maxlon: String(maxlon),
+    step_deg: String(stepDeg),
+  });
+  return apiFetch<RiskGridResponse>(`/api/predict/risk/grid?${qs}`);
 }
 
 export function fetchLandslidePrediction(lat: number, lon: number) {

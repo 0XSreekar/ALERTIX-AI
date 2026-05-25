@@ -19,7 +19,6 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
     # ── audit_log: rename columns, add new ones ────────────────────────────
-    # Rename target_table -> entity_type, target_id -> entity_id, payload -> details
     with op.batch_alter_table("audit_log") as batch_op:
         batch_op.alter_column("target_table", new_column_name="entity_type", existing_type=sa.String())
         batch_op.alter_column("target_id", new_column_name="entity_id", existing_type=UUID(as_uuid=True))
@@ -27,10 +26,10 @@ def upgrade() -> None:
         batch_op.add_column(sa.Column("role", sa.String(), nullable=True))
         batch_op.add_column(sa.Column("ip_hash", sa.String(64), nullable=True))
 
-    # Indexes on audit_log
-    op.create_index("audit_log_actor_idx", "audit_log", ["actor_user_id"])
-    op.create_index("audit_log_entity_idx", "audit_log", ["entity_type", "entity_id"])
-    op.create_index("audit_log_created_idx", "audit_log", ["created_at"])
+    # Indexes on audit_log — IF NOT EXISTS avoids abort inside a single txn
+    op.execute("CREATE INDEX IF NOT EXISTS audit_log_actor_idx ON audit_log (actor_user_id)")
+    op.execute("CREATE INDEX IF NOT EXISTS audit_log_entity_idx ON audit_log (entity_type, entity_id)")
+    op.execute("CREATE INDEX IF NOT EXISTS audit_log_created_idx ON audit_log (created_at)")
 
     # ── SOS reports: add status enum column ───────────────────────────────
     sos_status_enum = sa.Enum(
@@ -48,112 +47,53 @@ def upgrade() -> None:
             server_default="pending",
         ),
     )
-    op.create_index("sos_status_idx", "sos_reports", ["status"])
+    op.execute("CREATE INDEX IF NOT EXISTS sos_status_idx ON sos_reports (status)")
 
-    # ── Missing database indexes (issue 21) ───────────────────────────────
-    # hazard_events: composite unique already enforced by schema; add created_at index
-    op.create_index(
-        "hazard_events_created_idx",
-        "hazard_events",
-        ["created_at"],
-        postgresql_ops={"created_at": "DESC"},
-    )
+    # ── Missing / supplemental indexes ────────────────────────────────────
+    op.execute("CREATE INDEX IF NOT EXISTS hazard_events_created_idx ON hazard_events (created_at DESC)")
 
-    # earthquakes: composite unique on (source, external_id) — ensure index exists
-    try:
-        op.create_unique_constraint(
-            "uq_earthquakes_source_external_id", "earthquakes", ["source", "external_id"]
-        )
-    except Exception:
-        pass  # already exists from earlier migration
-
-    op.create_index(
-        "earthquakes_created_idx",
-        "earthquakes",
-        ["occurred_at"],
-        postgresql_ops={"occurred_at": "DESC"},
+    # earthquakes
+    op.execute(
+        "DO $$ BEGIN "
+        "  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'uq_earthquakes_source_external_id') THEN "
+        "    ALTER TABLE earthquakes ADD CONSTRAINT uq_earthquakes_source_external_id UNIQUE (source, external_id); "
+        "  END IF; "
+        "END $$"
     )
-    op.create_index(
-        "earthquakes_location_gist_idx",
-        "earthquakes",
-        ["location"],
-        postgresql_using="gist",
-    )
+    op.execute("CREATE INDEX IF NOT EXISTS earthquakes_created_idx ON earthquakes (occurred_at DESC)")
+    op.execute("CREATE INDEX IF NOT EXISTS earthquakes_location_gist_idx ON earthquakes USING gist (location)")
 
     # wildfires
-    try:
-        op.create_unique_constraint(
-            "uq_wildfires_source_external_id", "wildfires", ["source", "external_id"]
-        )
-    except Exception:
-        pass
+    op.execute(
+        "DO $$ BEGIN "
+        "  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'uq_wildfires_source_external_id') THEN "
+        "    ALTER TABLE wildfires ADD CONSTRAINT uq_wildfires_source_external_id UNIQUE (source, external_id); "
+        "  END IF; "
+        "END $$"
+    )
+    op.execute("CREATE INDEX IF NOT EXISTS wildfires_created_idx ON wildfires (detected_at DESC)")
+    op.execute("CREATE INDEX IF NOT EXISTS wildfires_location_gist_idx ON wildfires USING gist (location)")
 
-    op.create_index(
-        "wildfires_created_idx",
-        "wildfires",
-        ["detected_at"],
-        postgresql_ops={"detected_at": "DESC"},
-    )
-    op.create_index(
-        "wildfires_location_gist_idx",
-        "wildfires",
-        ["location"],
-        postgresql_using="gist",
-    )
+    # river_gauges (003 already creates river_gauges_observed_idx — IF NOT EXISTS is safe)
+    op.execute("CREATE INDEX IF NOT EXISTS river_gauges_observed_idx ON river_gauges (observed_at DESC)")
+    op.execute("CREATE INDEX IF NOT EXISTS river_gauges_location_gist_idx ON river_gauges USING gist (location)")
 
-    # river_gauges
-    op.create_index(
-        "river_gauges_observed_idx",
-        "river_gauges",
-        ["observed_at"],
-        postgresql_ops={"observed_at": "DESC"},
+    # weather_events (003 already creates weather_events_observed_idx — IF NOT EXISTS is safe)
+    op.execute(
+        "DO $$ BEGIN "
+        "  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'uq_weather_events_source_external_id') THEN "
+        "    ALTER TABLE weather_events ADD CONSTRAINT uq_weather_events_source_external_id UNIQUE (source, external_id); "
+        "  END IF; "
+        "END $$"
     )
-    op.create_index(
-        "river_gauges_location_gist_idx",
-        "river_gauges",
-        ["location"],
-        postgresql_using="gist",
-    )
+    op.execute("CREATE INDEX IF NOT EXISTS weather_events_observed_idx ON weather_events (observed_at DESC)")
+    op.execute("CREATE INDEX IF NOT EXISTS weather_events_location_gist_idx ON weather_events USING gist (location)")
 
-    # weather_events
-    try:
-        op.create_unique_constraint(
-            "uq_weather_events_source_external_id", "weather_events", ["source", "external_id"]
-        )
-    except Exception:
-        pass
-
-    op.create_index(
-        "weather_events_observed_idx",
-        "weather_events",
-        ["observed_at"],
-        postgresql_ops={"observed_at": "DESC"},
-    )
-    op.create_index(
-        "weather_events_location_gist_idx",
-        "weather_events",
-        ["location"],
-        postgresql_using="gist",
-    )
-
-    # alerts: created_at DESC index (already created by model but add if missing)
-    try:
-        op.create_index(
-            "alerts_created_desc_idx",
-            "alerts",
-            ["created_at"],
-            postgresql_ops={"created_at": "DESC"},
-        )
-    except Exception:
-        pass
+    # alerts
+    op.execute("CREATE INDEX IF NOT EXISTS alerts_created_desc_idx ON alerts (created_at DESC)")
 
     # sos_reports: created_at DESC
-    op.create_index(
-        "sos_created_idx",
-        "sos_reports",
-        ["created_at"],
-        postgresql_ops={"created_at": "DESC"},
-    )
+    op.execute("CREATE INDEX IF NOT EXISTS sos_created_idx ON sos_reports (created_at DESC)")
 
 
 def downgrade() -> None:

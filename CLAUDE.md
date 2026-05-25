@@ -62,10 +62,21 @@ docker compose up --build   # Postgres + Redis + backend + frontend
 - **Database:** Supabase Postgres 15 + PostGIS (all geo columns use SRID 4326)
 - **Cache/queue:** Upstash Redis (Streams for ingestion, pub/sub for WebSocket fan-out)
 - **Auth:** Local FastAPI auth in `app/api/auth.py` (bcrypt + HS256 JWT issued via `/api/auth/signup` and `/api/auth/login`). Three roles: citizen, official, admin. Frontend stores the token via `src/lib/localAuth.ts` in `localStorage`; `src/lib/api.ts` forwards it as `Authorization: Bearer <token>`. The HS256 secret is read from `SUPABASE_JWT_SECRET` (name kept for legacy; falls back to a dev default if unset).
-- **LLM model on Groq:** `llama-3.3-70b-versatile` (Llama 3.1 was decommissioned).
 - **Object storage:** Cloudflare R2
-- **LLM (Phase 2 only):** Ollama Qwen2.5-7B → Groq Llama 3.1 70B → Gemini 1.5 Flash fallback ladder
+- **LLM provider ladder (Phase 2):** Ollama (local, optional) → **Cerebras (primary cloud)** → Groq → Gemini → templated fallback. Wiring lives in `backend/app/llm/provider.py`. API keys go in `.env` (`CEREBRAS_API_KEY`, `GROQ_API_KEY`, `GEMINI_API_KEY`).
+- **Primary LLM:** Cerebras Inference, model `llama3.1-8b` (set via `CEREBRAS_MODEL` in `.env`). The Llama-3.3-70B in the original spec is not on Cerebras's current free tier; the 235B Qwen MoE is available but rate-limits aggressively under the worker's 30s tick. Llama3.1-8b fits the 30 req/min quota cleanly.
+- **Groq fallback model:** `llama-3.3-70b-versatile` (Llama 3.1 was decommissioned).
+- **Local LLM (optional, privacy/offline path):** Ollama Qwen2.5-7B. Provider checks Ollama health first and skips it silently if not running, so leaving Ollama off is fine in dev.
 - **Hosting:** Backend on Render free, frontend on Cloudflare Pages, cron via GitHub Actions
+
+## Workflow
+
+- **After finishing any non-trivial change, commit and push to GitHub.** The
+  remote is `origin` → `https://github.com/0XSreekar/ALERTIX-AI.git`. Standard
+  flow: `git add` only the files you touched, write a conventional commit
+  message, `git push origin <branch>`. Do not skip hooks. Do not force-push to
+  `main`. Open a PR for cross-cutting changes; small fixes can go directly to
+  the working branch.
 
 ## Key conventions
 
@@ -81,7 +92,7 @@ docker compose up --build   # Postgres + Redis + backend + frontend
 ## Two-phase build
 
 - **Phase 1:** All infrastructure, DB, ingestion, APIs, WebSocket, SOS form, frontend, deployment, CI/CD, tests. NO LLM or ML model training.
-- **Phase 2:** LLM integration (Ollama/Groq/Gemini), ML model training (seismic LSTM, Omori, flood LSTM, U-Net, wildfire DBSCAN, landslide rules, damage DeepLabV3, composite XGBoost).
+- **Phase 2:** LLM integration (Cerebras primary; Ollama/Groq/Gemini fallbacks) and ML model training (seismic LSTM autoencoder, Omori aftershocks, flood LSTM, U-Net flood extent, wildfire DBSCAN, landslide rules, damage DeepLabV3, composite XGBoost risk index). Training scripts live in `ml/scripts/`; weights are referenced via `.env` (`SEISMIC_AE_CHECKPOINT`, `FLOOD_LSTM_CHECKPOINT`, `DAMAGE_MODEL_CHECKPOINT`, `RISK_INDEX_CHECKPOINT`). Inference modules in `backend/app/ml/` degrade gracefully when weights are missing.
 
 ## Environment
 

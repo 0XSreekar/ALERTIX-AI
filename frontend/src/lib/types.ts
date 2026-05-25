@@ -85,6 +85,19 @@ export interface WildfirePrediction {
   total_hotspots: number;
 }
 
+export interface RiskGridCell {
+  lat: number;
+  lon: number;
+  risk_index: number;
+  tier: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+}
+
+export interface RiskGridResponse {
+  cells: RiskGridCell[];
+  radius_km: number;
+  model_version: string;
+}
+
 export interface LandslidePrediction {
   gsi_zone: string | null;
   rainfall_threshold_exceeded: boolean;

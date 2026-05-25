@@ -29,6 +29,9 @@ class Settings(BaseSettings):
     # Model & ML settings
     model_weights_dir: str = "./models"
     require_model_weights: bool = False
+    seismic_ae_checkpoint: str = ""
+    flood_lstm_checkpoint: str = ""
+    risk_index_checkpoint: str = ""
 
     # AI guardrails and behavior
     enable_ai_guardrails: bool = True
@@ -73,6 +76,8 @@ class Settings(BaseSettings):
     # LLM (Phase 2)
     ollama_url: str = "http://localhost:11434"
     ollama_tunnel_url: str = ""
+    cerebras_api_key: str = ""
+    cerebras_model: str = "llama-3.3-70b"
     groq_api_key: str = ""
     gemini_api_key: str = ""
 

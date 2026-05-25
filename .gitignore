@@ -61,6 +61,7 @@ ml/models/
 *.log
 logs/
 .cache/
+backend/uploads/
 
 # Alembic — keep versions/, ignore working files
 backend/alembic/__pycache__/

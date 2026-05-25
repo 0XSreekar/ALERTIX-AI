@@ -33,36 +33,86 @@ _ALLOWED_MIME_TYPES = {"image/jpeg", "image/png", "application/pdf"}
 _MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024  # 10 MB
 
 
-async def _run_llm_triage(sos_id: str, raw_text: str, location_text: str) -> None:
-    """Background task: LLM triage scoring written back to DB."""
+async def _run_sos_enrichment(sos_id: str, raw_text: str, has_user_location: bool) -> None:
+    """Background task: NER + geocoding + LLM triage, written back to DB."""
     try:
+        from app.citizen.lang_detect import detect_language, translate_to_english
+        from app.citizen.sos_enrich import enrich_sos
         from app.llm import provider as llm
         from app.llm.prompts import SOS_TRIAGE
 
-        prompt = SOS_TRIAGE.format(message=raw_text, location=location_text or "unknown")
-        raw, _provider = await llm.generate(prompt)
-        if not raw:
-            return
-        import re
+        # 0) Detect script; translate Indic-language SOS to English for NER + triage
+        lang_code = detect_language(raw_text)
+        english_text = (
+            raw_text if lang_code == "en" else await translate_to_english(raw_text, lang_code)
+        )
 
-        match = re.search(r"\{.*\}", raw, re.DOTALL)
-        if not match:
-            return
-        data = json.loads(match.group(0))
+        # 1) NER + geocoding (on English text — Nominatim place index is English-dominant)
+        enriched = await enrich_sos(english_text)
+
+        # 2) LLM triage (best-effort, uses provider ladder)
+        urgency: int | None = None
+        summary: str | None = None
+        try:
+            prompt = SOS_TRIAGE.format(
+                message=english_text, location=enriched.chosen_place or "unknown"
+            )
+            raw, _provider = await llm.generate(prompt)
+            if raw:
+                import re as _re
+
+                match = _re.search(r"\{.*\}", raw, _re.DOTALL)
+                if match:
+                    data = json.loads(match.group(0))
+                    urgency = data.get("urgency_score")
+                    summary = data.get("summary")
+        except Exception:
+            log.warning("sos_triage_llm_failed sos_id=%s", sos_id)
+
+        # 3) Write enrichment back. Only update lat/lon if the user didn't provide it.
         async with async_session_factory() as sess:
+            params: dict = {
+                "id": sos_id,
+                "extracted": enriched.chosen_place,
+                "score": urgency,
+                "summary": summary,
+            }
+            location_clause = ""
+            if (
+                not has_user_location
+                and enriched.latitude is not None
+                and enriched.longitude is not None
+            ):
+                location_clause = (
+                    ", location = ST_SetSRID(ST_MakePoint(:lon, :lat), 4326)::geography"
+                )
+                params["lat"] = enriched.latitude
+                params["lon"] = enriched.longitude
+
             await sess.execute(
-                text("""
+                text(f"""
                     UPDATE sos_reports
-                    SET urgency_score = :score,
-                        llm_summary   = :summary,
+                    SET extracted_location_text = :extracted,
+                        urgency_score = COALESCE(:score, urgency_score),
+                        llm_summary   = COALESCE(:summary, llm_summary),
                         triaged       = TRUE
+                        {location_clause}
                     WHERE id = :id
                 """),
-                {"score": data.get("urgency_score"), "summary": data.get("summary"), "id": sos_id},
+                params,
             )
             await sess.commit()
+        log.info(
+            "sos_enriched",
+            sos_id=sos_id,
+            lang=lang_code,
+            translated=lang_code != "en",
+            place=enriched.chosen_place,
+            geocoded=enriched.latitude is not None,
+            urgency=urgency,
+        )
     except Exception:
-        log.exception("sos_triage_failed", sos_id=sos_id)
+        log.exception("sos_enrichment_failed", sos_id=sos_id)
 
 
 @router.post("")
@@ -121,8 +171,13 @@ async def submit_sos(
 
     log.info("sos_submitted", sos_id=str(row.id), has_location=body.latitude is not None)
 
-    # Kick off async LLM triage (non-blocking)
-    background_tasks.add_task(_run_llm_triage, str(row.id), body.raw_text, "")
+    # Kick off async NER + geocoding + LLM triage (non-blocking)
+    background_tasks.add_task(
+        _run_sos_enrichment,
+        str(row.id),
+        body.raw_text,
+        body.latitude is not None and body.longitude is not None,
+    )
 
     return {"id": str(row.id), "created_at": row.created_at.isoformat(), "status": "received"}
 

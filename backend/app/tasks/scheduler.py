@@ -16,6 +16,7 @@ from app.ingestion.usgs import ingest_usgs
 from app.ingestion.weather.service import ingest_weather
 from app.ingestion.wildfire.service import ingest_firms
 from app.logging import get_logger
+from app.tasks.llm_worker import process_pending_alerts
 
 log = get_logger(__name__)
 scheduler = AsyncIOScheduler()
@@ -80,6 +81,16 @@ async def _run_cyclones() -> None:
             log.exception("scheduler_cyclones_error")
 
 
+async def _run_llm_explanations() -> None:
+    """Backfill plain-language explanations for pending alerts via LLM ladder."""
+    try:
+        stats = await process_pending_alerts()
+        if stats["processed"]:
+            log.info("scheduler_llm_done", **stats)
+    except Exception:
+        log.exception("scheduler_llm_error")
+
+
 def start_scheduler() -> None:
     settings = get_settings()
     if settings.is_production:
@@ -126,8 +137,19 @@ def start_scheduler() -> None:
         replace_existing=True,
     )
 
+    # LLM explanation backfill — every 30 s (small batches)
+    scheduler.add_job(
+        _run_llm_explanations,
+        trigger=IntervalTrigger(seconds=30),
+        id="llm_explanations",
+        replace_existing=True,
+    )
+
     scheduler.start()
-    log.info("scheduler_started", jobs=["usgs", "firms", "cwc", "weather", "cyclones"])
+    log.info(
+        "scheduler_started",
+        jobs=["usgs", "firms", "cwc", "weather", "cyclones", "llm_explanations"],
+    )
 
 
 def stop_scheduler() -> None:

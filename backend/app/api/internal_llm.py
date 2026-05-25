@@ -88,6 +88,7 @@ async def llm_health() -> dict:
     ollama_up = await OllamaClient().health()
     return {
         "ollama": ollama_up,
+        "cerebras_configured": bool(settings.cerebras_api_key),
         "groq_configured": bool(settings.groq_api_key),
         "gemini_configured": bool(settings.gemini_api_key),
     }

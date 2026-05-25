@@ -80,12 +80,17 @@ async def security_headers_middleware(request: Request, call_next: Any) -> Respo
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["X-XSS-Protection"] = "1; mode=block"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    # Allow http/ws connections in dev so the Vite frontend can reach localhost:8000
+    if settings.is_production:
+        connect_src = "'self' wss: https:"
+    else:
+        connect_src = "'self' http: https: ws: wss:"
     response.headers["Content-Security-Policy"] = (
         "default-src 'self'; "
         "script-src 'self' 'unsafe-inline'; "
         "style-src 'self' 'unsafe-inline'; "
         "img-src 'self' data: https:; "
-        "connect-src 'self' wss: https:;"
+        f"connect-src {connect_src};"
     )
     if settings.is_production:
         response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"

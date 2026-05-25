@@ -64,3 +64,36 @@ class LandslidePrediction(BaseModel):
     cumulative_rainfall_mm: float | None = None
     threshold_mm: float | None = None
     risk_level: str = "low"
+
+
+class RiskIndexFeatures(BaseModel):
+    eq_count_30d: float = 0
+    eq_max_magnitude: float = 0
+    flood_max_intensity: float = 0
+    rainfall_72h_mm: float = 0
+    wildfire_count_24h: float = 0
+    cyclone_wind_kmh: float = 0
+    landslide_rule_score: float = 0
+
+
+class RiskIndexPrediction(BaseModel):
+    lat: float
+    lon: float
+    radius_km: float
+    risk_index: float | None = None
+    tier: str = "LOW"
+    features: RiskIndexFeatures
+    model_version: str = "phase2-xgboost-fusion"
+
+
+class RiskGridCell(BaseModel):
+    lat: float
+    lon: float
+    risk_index: float
+    tier: str
+
+
+class RiskGridResponse(BaseModel):
+    cells: list[RiskGridCell]
+    radius_km: float
+    model_version: str = "phase2-xgboost-fusion"

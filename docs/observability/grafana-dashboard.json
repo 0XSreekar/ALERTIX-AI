@@ -1,0 +1,104 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "type": "stat",
+      "title": "Total events ingested (last 24h)",
+      "id": 1,
+      "datasource": "Prometheus",
+      "targets": [
+        { "expr": "sum(increase(alertix_ingest_stored_total[24h]))", "legendFormat": "stored" }
+      ],
+      "gridPos": { "h": 6, "w": 6, "x": 0, "y": 0 },
+      "fieldConfig": { "defaults": { "unit": "short", "color": { "mode": "thresholds" }, "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] } } },
+      "options": { "colorMode": "value", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"] }, "textMode": "auto" }
+    },
+    {
+      "type": "stat",
+      "title": "Malformed events (last 1h)",
+      "id": 2,
+      "datasource": "Prometheus",
+      "targets": [
+        { "expr": "sum(increase(alertix_ingest_malformed_total[1h]))", "legendFormat": "malformed" }
+      ],
+      "gridPos": { "h": 6, "w": 6, "x": 6, "y": 0 },
+      "fieldConfig": { "defaults": { "unit": "short", "color": { "mode": "thresholds" }, "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "orange", "value": 10 }, { "color": "red", "value": 50 }] } } },
+      "options": { "colorMode": "value", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } }
+    },
+    {
+      "type": "stat",
+      "title": "Duplicate ratio (1h)",
+      "id": 3,
+      "datasource": "Prometheus",
+      "targets": [
+        { "expr": "sum(increase(alertix_ingest_duplicates_total[1h])) / clamp_min(sum(increase(alertix_ingest_parsed_total[1h])), 1)", "legendFormat": "dup ratio" }
+      ],
+      "gridPos": { "h": 6, "w": 6, "x": 12, "y": 0 },
+      "fieldConfig": { "defaults": { "unit": "percentunit", "color": { "mode": "thresholds" }, "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 0.5 }, { "color": "red", "value": 0.9 }] } } },
+      "options": { "colorMode": "value", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } }
+    },
+    {
+      "type": "stat",
+      "title": "Active ingestion sources",
+      "id": 4,
+      "datasource": "Prometheus",
+      "targets": [
+        { "expr": "count(count by (source) (alertix_ingest_fetched_total))", "legendFormat": "sources" }
+      ],
+      "gridPos": { "h": 6, "w": 6, "x": 18, "y": 0 },
+      "fieldConfig": { "defaults": { "unit": "short" } },
+      "options": { "colorMode": "value", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } }
+    },
+    {
+      "type": "timeseries",
+      "title": "Ingestion rate by source (events / 5m)",
+      "id": 5,
+      "datasource": "Prometheus",
+      "targets": [
+        { "expr": "sum by (source) (rate(alertix_ingest_stored_total[5m]))", "legendFormat": "{{source}}" }
+      ],
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 6 },
+      "fieldConfig": { "defaults": { "unit": "ops", "custom": { "lineWidth": 2, "fillOpacity": 10 } } }
+    },
+    {
+      "type": "timeseries",
+      "title": "Processing stream depth",
+      "id": 6,
+      "datasource": "Prometheus",
+      "targets": [
+        { "expr": "alertix_processing_pending", "legendFormat": "{{stream}}" }
+      ],
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+      "fieldConfig": { "defaults": { "unit": "short" } }
+    },
+    {
+      "type": "timeseries",
+      "title": "Malformed vs valid (5m rate)",
+      "id": 7,
+      "datasource": "Prometheus",
+      "targets": [
+        { "expr": "sum(rate(alertix_ingest_malformed_total[5m]))", "legendFormat": "malformed" },
+        { "expr": "sum(rate(alertix_ingest_valid_total[5m]))", "legendFormat": "valid" }
+      ],
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+      "fieldConfig": { "defaults": { "unit": "ops" } }
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 39,
+  "tags": ["alertix", "ingestion"],
+  "templating": { "list": [] },
+  "time": { "from": "now-6h", "to": "now" },
+  "timepicker": {},
+  "timezone": "",
+  "title": "Alertix AI — Ingestion & Processing",
+  "uid": "alertix-ingest",
+  "version": 1,
+  "weekStart": ""
+}
