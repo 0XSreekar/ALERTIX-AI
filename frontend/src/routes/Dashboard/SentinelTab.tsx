@@ -155,7 +155,7 @@ export default function SentinelTab() {
 
       {/* ─── Main: Globe (left, dominant) + Threats list (right) ───── */}
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr),320px]">
-        <div className="relative h-[600px] overflow-hidden rounded-xl border border-border/60 bg-[radial-gradient(ellipse_at_center,_rgba(15,42,68,0.6)_0%,_rgba(2,6,17,1)_70%)]">
+        <div className="relative h-[600px] overflow-hidden rounded-xl border border-border/60 bg-[radial-gradient(ellipse_at_center,_rgba(15,42,68,0.5)_0%,_rgba(2,6,17,1)_75%)]">
           <Globe
             events={allEventsOnGlobe}
             selectedId={selectedId}

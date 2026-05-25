@@ -1,9 +1,10 @@
 /**
- * Sentinel 3D globe — earth sphere with live event particles, forecast cones,
- * and hazard halos. Camera flies to the selected event.
+ * Sentinel 3D globe — photorealistic Earth (NASA Blue Marble + bump + spec +
+ * night lights), atmosphere shader, live event markers, forecast tracks +
+ * halos, camera fly-to on selection.
  */
-import { useEffect, useMemo, useRef } from "react";
-import { Canvas, useFrame, useThree, type ThreeEvent } from "@react-three/fiber";
+import { Suspense, useEffect, useMemo, useRef } from "react";
+import { Canvas, useFrame, useLoader, useThree, type ThreeEvent } from "@react-three/fiber";
 import { OrbitControls, Stars } from "@react-three/drei";
 import * as THREE from "three";
 import type {
@@ -21,7 +22,7 @@ const HAZARD_COLOR: Record<string, string> = {
 };
 
 const RADIUS = 2;
-const KM_TO_RAD = 1 / 6371; // 1 km in radians on a unit sphere
+const KM_TO_RAD = 1 / 6371;
 
 function latLonToVec3(lat: number, lon: number, r = RADIUS): [number, number, number] {
   const phi = (90 - lat) * (Math.PI / 180);
@@ -44,48 +45,75 @@ function severity(e: SentinelStreamEvent): number {
   return 0.5;
 }
 
+// ─── Real Earth ─────────────────────────────────────────────────────────────
+
 function Earth() {
-  const meshRef = useRef<THREE.Mesh>(null);
-  // Subtle wireframe-style inner sphere; particles ride a glass-like outer shell
+  const [colorMap, bumpMap, specMap, nightMap] = useLoader(THREE.TextureLoader, [
+    "/textures/earth.jpg",
+    "/textures/earth-topology.png",
+    "/textures/water.png",
+    "/textures/night.jpg",
+  ]);
+
+  // Improve colour quality
+  useMemo(() => {
+    [colorMap, nightMap].forEach((t) => {
+      t.colorSpace = THREE.SRGBColorSpace;
+      t.anisotropy = 8;
+    });
+  }, [colorMap, nightMap]);
+
+  const earthRef = useRef<THREE.Mesh>(null);
   useFrame((_s, delta) => {
-    if (meshRef.current) meshRef.current.rotation.y += delta * 0.015;
+    if (earthRef.current) earthRef.current.rotation.y += delta * 0.015;
   });
+
   return (
     <group>
-      {/* Solid core */}
-      <mesh>
-        <sphereGeometry args={[RADIUS * 0.98, 64, 64]} />
+      <mesh ref={earthRef}>
+        <sphereGeometry args={[RADIUS, 96, 96]} />
         <meshPhongMaterial
-          color="#0f2238"
-          emissive="#0c1a2c"
-          emissiveIntensity={0.5}
-          shininess={20}
+          map={colorMap}
+          bumpMap={bumpMap}
+          bumpScale={0.04}
+          specularMap={specMap}
           specular={new THREE.Color("#3b82f6")}
+          shininess={18}
+          emissiveMap={nightMap}
+          emissive={new THREE.Color("#fff6c2")}
+          emissiveIntensity={0.45}
         />
       </mesh>
-      {/* Wireframe overlay — gives it ops-room feel */}
-      <mesh ref={meshRef}>
-        <sphereGeometry args={[RADIUS, 28, 20]} />
-        <meshBasicMaterial
-          color="#1e3a5f"
-          wireframe
+      {/* Atmosphere — inverted-normal halo */}
+      <mesh>
+        <sphereGeometry args={[RADIUS * 1.025, 64, 64]} />
+        <shaderMaterial
+          attach="material"
           transparent
-          opacity={0.45}
+          side={THREE.BackSide}
+          uniforms={{ glowColor: { value: new THREE.Color("#3b82f6") } }}
+          vertexShader={`
+            varying vec3 vNormal;
+            void main() {
+              vNormal = normalize(normalMatrix * normal);
+              gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+            }
+          `}
+          fragmentShader={`
+            varying vec3 vNormal;
+            uniform vec3 glowColor;
+            void main() {
+              float intensity = pow(0.65 - dot(vNormal, vec3(0.0, 0.0, 1.0)), 2.2);
+              gl_FragColor = vec4(glowColor, 1.0) * intensity;
+            }
+          `}
         />
-      </mesh>
-      {/* Inner soft glow */}
-      <mesh>
-        <sphereGeometry args={[RADIUS * 1.02, 48, 48]} />
-        <meshBasicMaterial color="#22d3ee" transparent opacity={0.04} side={THREE.BackSide} />
-      </mesh>
-      {/* Outer halo */}
-      <mesh>
-        <sphereGeometry args={[RADIUS * 1.08, 48, 48]} />
-        <meshBasicMaterial color="#3b82f6" transparent opacity={0.06} side={THREE.BackSide} />
       </mesh>
     </group>
   );
 }
+
+// ─── India outline (subtle) ─────────────────────────────────────────────────
 
 function IndiaBoundsRing() {
   const corners = useMemo(() => {
@@ -96,7 +124,7 @@ function IndiaBoundsRing() {
     for (let i = 0; i < path.length - 1; i++) {
       const [lat0, lon0] = path[i];
       const [lat1, lon1] = path[i + 1];
-      const STEPS = 32;
+      const STEPS = 48;
       for (let s = 0; s <= STEPS; s++) {
         const t = s / STEPS;
         const lat = lat0 + (lat1 - lat0) * t;
@@ -110,10 +138,12 @@ function IndiaBoundsRing() {
   return (
     <line>
       <primitive object={geom} attach="geometry" />
-      <lineBasicMaterial color="#22d3ee" transparent opacity={0.4} />
+      <lineBasicMaterial color="#22d3ee" transparent opacity={0.55} />
     </line>
   );
 }
+
+// ─── Event markers — vertical pin + glow ────────────────────────────────────
 
 interface EventPointProps {
   event: SentinelStreamEvent;
@@ -122,51 +152,75 @@ interface EventPointProps {
 }
 
 function EventPoint({ event, selected, onSelect }: EventPointProps) {
-  const pos = useMemo(
-    () => latLonToVec3(event.lat, event.lon, RADIUS * 1.01),
+  const surfacePos = useMemo(
+    () => latLonToVec3(event.lat, event.lon, RADIUS * 1.005),
     [event.lat, event.lon],
   );
+  const dir = useMemo(() => new THREE.Vector3(...surfacePos).normalize(), [surfacePos]);
   const sev = severity(event);
-  const color = HAZARD_COLOR[event.hazard_type] ?? "#9ca3af";
-  const size = 0.015 + sev * 0.05 + (selected ? 0.02 : 0);
+  const color = HAZARD_COLOR[event.hazard_type] ?? "#fde047";
+  const size = 0.018 + sev * 0.04 + (selected ? 0.012 : 0);
+  const pinHeight = 0.05 + sev * 0.16 + (selected ? 0.04 : 0);
+  // Pin endpoint above surface
+  const pinTip = useMemo(
+    () => dir.clone().multiplyScalar(RADIUS * 1.005 + pinHeight),
+    [dir, pinHeight],
+  );
+  const pinMid = useMemo(
+    () => dir.clone().multiplyScalar(RADIUS * 1.005 + pinHeight * 0.5),
+    [dir, pinHeight],
+  );
+  // Orient the pin cylinder so its Y-axis points along `dir`
+  const pinQuat = useMemo(() => {
+    const q = new THREE.Quaternion();
+    q.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
+    return q;
+  }, [dir]);
 
-  const meshRef = useRef<THREE.Mesh>(null);
+  const headRef = useRef<THREE.Mesh>(null);
   useFrame(({ clock }) => {
-    if (!meshRef.current) return;
-    const t = clock.elapsedTime * 1.8;
-    const scale = 1 + Math.sin(t + pos[0]) * 0.15 * (sev + 0.4);
-    meshRef.current.scale.setScalar(scale);
+    if (!headRef.current) return;
+    const t = clock.elapsedTime * 2.2 + surfacePos[0];
+    const s = 1 + Math.sin(t) * 0.18 * (sev + 0.5);
+    headRef.current.scale.setScalar(s);
   });
 
   return (
-    <group position={pos}>
+    <group>
+      {/* Vertical pin shaft */}
+      <mesh position={pinMid} quaternion={pinQuat}>
+        <cylinderGeometry args={[0.003, 0.006, pinHeight, 8]} />
+        <meshBasicMaterial color={color} transparent opacity={0.85} />
+      </mesh>
+      {/* Pin head — clickable */}
       <mesh
-        ref={meshRef}
+        ref={headRef}
+        position={pinTip}
         onClick={(e: ThreeEvent<MouseEvent>) => {
           e.stopPropagation();
           onSelect();
         }}
       >
-        <sphereGeometry args={[size, 12, 12]} />
-        <meshBasicMaterial color={color} transparent opacity={0.9} />
+        <sphereGeometry args={[size, 14, 14]} />
+        <meshBasicMaterial color={color} />
       </mesh>
-      <mesh>
+      {/* Halo around head */}
+      <mesh position={pinTip}>
         <sphereGeometry args={[size * 2.6, 12, 12]} />
-        <meshBasicMaterial color={color} transparent opacity={0.18} />
+        <meshBasicMaterial color={color} transparent opacity={0.22} />
       </mesh>
-      {sev > 0.5 && (
-        <mesh
-          position={[pos[0] * 0.06, pos[1] * 0.06, pos[2] * 0.06]}
-        >
-          <cylinderGeometry args={[0.005, 0.02, 0.3 * sev, 8]} />
-          <meshBasicMaterial color={color} transparent opacity={0.5} />
+      {/* Selected ring */}
+      {selected && (
+        <mesh position={pinTip} quaternion={pinQuat}>
+          <torusGeometry args={[size * 3.2, size * 0.18, 8, 32]} />
+          <meshBasicMaterial color={color} transparent opacity={0.85} />
         </mesh>
       )}
     </group>
   );
 }
 
-// ─── Forecast layers ─────────────────────────────────────────────────────────
+// ─── Cyclone forecast track ─────────────────────────────────────────────────
 
 function CycloneTrack({ forecast }: { forecast: SentinelCycloneForecast }) {
   const points = useMemo(() => {
@@ -174,7 +228,6 @@ function CycloneTrack({ forecast }: { forecast: SentinelCycloneForecast }) {
     return all.map((p) => new THREE.Vector3(...latLonToVec3(p.lat, p.lon, RADIUS * 1.015)));
   }, [forecast]);
   const geom = useMemo(() => new THREE.BufferGeometry().setFromPoints(points), [points]);
-  // Pulsing head dot at the latest predicted position
   const headPos = points[points.length - 1] ?? points[0];
   const headRef = useRef<THREE.Mesh>(null);
   useFrame(({ clock }) => {
@@ -187,31 +240,31 @@ function CycloneTrack({ forecast }: { forecast: SentinelCycloneForecast }) {
     <group>
       <line>
         <primitive object={geom} attach="geometry" />
-        <lineBasicMaterial color="#a78bfa" linewidth={2} transparent opacity={0.75} />
+        <lineBasicMaterial color="#a78bfa" linewidth={2} transparent opacity={0.85} />
       </line>
       {points.map((p, i) => (
         <mesh key={i} position={p}>
-          <sphereGeometry args={[0.012, 8, 8]} />
-          <meshBasicMaterial color="#a78bfa" transparent opacity={0.7 - i * 0.05} />
+          <sphereGeometry args={[0.013, 8, 8]} />
+          <meshBasicMaterial color="#a78bfa" transparent opacity={Math.max(0.2, 0.85 - i * 0.06)} />
         </mesh>
       ))}
       <mesh ref={headRef} position={headPos}>
-        <sphereGeometry args={[0.04, 16, 16]} />
-        <meshBasicMaterial color="#c4b5fd" transparent opacity={0.45} />
+        <sphereGeometry args={[0.045, 16, 16]} />
+        <meshBasicMaterial color="#c4b5fd" transparent opacity={0.55} />
       </mesh>
     </group>
   );
 }
 
+// ─── Hazard halo ─────────────────────────────────────────────────────────────
+
 function HazardHaloRing({ halo }: { halo: SentinelHazardHalo }) {
-  // Render as a flat ring tangent to the sphere
   const center = useMemo(
     () => new THREE.Vector3(...latLonToVec3(halo.lat, halo.lon, RADIUS * 1.005)),
     [halo],
   );
-  const radius = halo.radius_km * KM_TO_RAD * RADIUS; // approx for small caps
+  const radius = halo.radius_km * KM_TO_RAD * RADIUS;
   const color = halo.hazard_type === "earthquake" ? "#fca5a5" : "#7dd3fc";
-  // Orient the ring's plane normal to point outward from globe centre
   const normal = useMemo(() => center.clone().normalize(), [center]);
   const quat = useMemo(() => {
     const q = new THREE.Quaternion();
@@ -220,15 +273,18 @@ function HazardHaloRing({ halo }: { halo: SentinelHazardHalo }) {
   }, [normal]);
   return (
     <mesh position={center} quaternion={quat}>
-      <ringGeometry args={[radius * 0.95, radius, 64]} />
-      <meshBasicMaterial color={color} transparent opacity={0.35} side={THREE.DoubleSide} />
+      <ringGeometry args={[radius * 0.92, radius, 64]} />
+      <meshBasicMaterial color={color} transparent opacity={0.5} side={THREE.DoubleSide} />
     </mesh>
   );
 }
 
 // ─── Camera fly-to ──────────────────────────────────────────────────────────
 
-function CameraFlyTo({ target, controls }: {
+function CameraFlyTo({
+  target,
+  controls,
+}: {
   target: [number, number, number] | null;
   controls: React.MutableRefObject<{ target: THREE.Vector3; update: () => void } | null>;
 }) {
@@ -238,7 +294,7 @@ function CameraFlyTo({ target, controls }: {
   useEffect(() => {
     if (target) {
       const dir = new THREE.Vector3(...target).normalize();
-      goal.current = dir.multiplyScalar(RADIUS * 2.4);
+      goal.current = dir.multiplyScalar(RADIUS * 2.0);
     } else {
       goal.current = null;
     }
@@ -246,12 +302,12 @@ function CameraFlyTo({ target, controls }: {
 
   useFrame(() => {
     if (!goal.current) return;
-    camera.position.lerp(goal.current, 0.07);
+    camera.position.lerp(goal.current, 0.06);
     if (controls.current) {
       controls.current.target.lerp(new THREE.Vector3(0, 0, 0), 0.08);
       controls.current.update();
     }
-    if (camera.position.distanceTo(goal.current) < 0.02) goal.current = null;
+    if (camera.position.distanceTo(goal.current) < 0.03) goal.current = null;
   });
 
   return null;
@@ -276,7 +332,7 @@ export default function Globe({
   halos = [],
   autoRotate = true,
 }: GlobeProps) {
-  const indiaCam = useMemo(() => latLonToVec3(18, 82, RADIUS * 2.1), []);
+  const indiaCam = useMemo(() => latLonToVec3(18, 82, RADIUS * 2.4), []);
   const controlsRef = useRef<{ target: THREE.Vector3; update: () => void } | null>(null);
 
   const flyTarget = useMemo<[number, number, number] | null>(() => {
@@ -289,16 +345,21 @@ export default function Globe({
   return (
     <Canvas
       shadows
-      camera={{ position: indiaCam, fov: 35 }}
+      camera={{ position: indiaCam, fov: 38 }}
       onPointerMissed={() => onSelect(null)}
+      gl={{ antialias: true }}
     >
-      <ambientLight intensity={0.4} />
-      <directionalLight position={[5, 4, 6]} intensity={1.0} />
-      <pointLight position={[-3, -2, -4]} intensity={0.4} color="#3b82f6" />
+      <color attach="background" args={["#020617"]} />
+      <ambientLight intensity={0.25} />
+      {/* Sun-like directional light from a fixed angle */}
+      <directionalLight position={[8, 3, 5]} intensity={1.5} color="#fff8e1" />
+      <pointLight position={[-5, -2, -4]} intensity={0.35} color="#3b82f6" />
 
-      <Stars radius={50} depth={30} count={2000} factor={3} fade speed={0.5} />
+      <Stars radius={50} depth={30} count={3000} factor={3} fade speed={0.4} />
 
-      <Earth />
+      <Suspense fallback={null}>
+        <Earth />
+      </Suspense>
       <IndiaBoundsRing />
 
       {halos.map((h) => (
@@ -320,10 +381,10 @@ export default function Globe({
       <OrbitControls
         ref={controlsRef as unknown as React.Ref<never>}
         enablePan={false}
-        minDistance={RADIUS * 1.4}
+        minDistance={RADIUS * 1.3}
         maxDistance={RADIUS * 5}
         autoRotate={autoRotate && !flyTarget}
-        autoRotateSpeed={0.4}
+        autoRotateSpeed={0.3}
       />
     </Canvas>
   );
