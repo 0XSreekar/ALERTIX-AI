@@ -64,15 +64,15 @@ export default function StatsPanel({ events, cascade }: Props) {
   }, [cascade]);
 
   return (
-    <div className="grid h-full content-start gap-4">
+    <div className="grid gap-6 md:grid-cols-3">
       {/* Hazard distribution */}
-      <div className="rounded-xl border border-border/60 bg-card/40 p-4 backdrop-blur">
+      <div>
         <div className="mb-3 flex items-baseline justify-between">
           <h3 className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
             Hazard mix
           </h3>
           <span className="font-mono text-xs text-muted-foreground">
-            {counts.total} events / 24h
+            {counts.total} / 24h
           </span>
         </div>
         {counts.arr.length === 0 ? (
@@ -110,7 +110,7 @@ export default function StatsPanel({ events, cascade }: Props) {
       </div>
 
       {/* 24h sparkline */}
-      <div className="rounded-xl border border-border/60 bg-card/40 p-4 backdrop-blur">
+      <div>
         <div className="mb-3 flex items-baseline justify-between">
           <h3 className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
             Activity · 24h
@@ -161,7 +161,7 @@ export default function StatsPanel({ events, cascade }: Props) {
       </div>
 
       {/* Cascade patterns */}
-      <div className="rounded-xl border border-border/60 bg-card/40 p-4 backdrop-blur">
+      <div>
         <div className="mb-3 flex items-baseline justify-between">
           <h3 className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
             Cascade patterns

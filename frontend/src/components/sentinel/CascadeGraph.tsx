@@ -133,25 +133,21 @@ export default function CascadeGraph({ graph, selectedId, onSelect }: Props) {
 
   if (!graph || positioned.length === 0) {
     return (
-      <div className="flex h-[360px] items-center justify-center rounded-xl border border-border/60 bg-card/40 text-xs text-muted-foreground backdrop-blur">
-        No cascading hazards detected in the current window.
+      <div className="flex h-[300px] items-center justify-center text-xs text-muted-foreground">
+        No cascading hazards detected in the last 48 hours.
       </div>
     );
   }
 
   return (
-    <div className="overflow-hidden rounded-xl border border-border/60 bg-gradient-to-br from-slate-950/80 to-slate-900/80 backdrop-blur">
-      <div className="flex items-baseline justify-between border-b border-border/40 px-4 py-3">
-        <div>
-          <h3 className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-            Cascading hazards
-          </h3>
-          <p className="mt-0.5 text-[10px] text-muted-foreground/70">
-            Events linked by spatio-temporal proximity + plausible mechanism
-          </p>
-        </div>
+    <div>
+      <div className="mb-3 flex items-baseline justify-between">
+        <p className="text-xs text-muted-foreground">
+          When two hazards happen close together in space and time, they may
+          cascade. Hover an edge for details, click a node to inspect.
+        </p>
         <span className="font-mono text-[10px] text-muted-foreground">
-          {positioned.length} nodes · {graph.edges.length} edges · {graph.window_hours}h
+          {positioned.length} events · {graph.edges.length} links
         </span>
       </div>
       <svg

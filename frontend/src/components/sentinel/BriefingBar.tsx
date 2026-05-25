@@ -36,30 +36,26 @@ export default function BriefingBar({ contextEventIds }: Props) {
   };
 
   return (
-    <section className="overflow-hidden rounded-xl border border-border/60 bg-gradient-to-br from-slate-950/80 via-slate-900/70 to-slate-950/80 backdrop-blur">
-      <div className="absolute inset-x-0 h-px bg-gradient-to-r from-transparent via-cyan-400/40 to-transparent" />
-      <div className="space-y-3 p-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="rounded-md bg-cyan-500/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.2em] text-cyan-300">
-              AI Briefing
-            </span>
-            <span className="text-[11px] text-muted-foreground">
-              grounded on {contextEventIds.length} visible events
-            </span>
-          </div>
-          {answer && (
-            <button
-              onClick={() => {
-                setAnswer(null);
-                setError("");
-              }}
-              className="text-[11px] text-muted-foreground hover:text-foreground"
-            >
-              clear
-            </button>
-          )}
-        </div>
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <p className="text-xs text-muted-foreground">
+          Ask anything about the hazards visible on the map. Answers cite the
+          actual event IDs.
+        </p>
+        {answer && (
+          <button
+            onClick={() => {
+              setAnswer(null);
+              setError("");
+            }}
+            className="text-[11px] text-muted-foreground hover:text-foreground"
+          >
+            clear
+          </button>
+        )}
+      </div>
+      <div className="space-y-3">
+        {/* spacer to keep diff small below */}
 
         <div className="flex gap-2">
           <input
@@ -143,6 +139,6 @@ export default function BriefingBar({ contextEventIds }: Props) {
           </div>
         )}
       </div>
-    </section>
+    </div>
   );
 }
