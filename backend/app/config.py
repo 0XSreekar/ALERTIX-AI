@@ -80,7 +80,7 @@ class Settings(BaseSettings):
     cerebras_model: str = "llama-3.3-70b"
     groq_api_key: str = ""
     gemini_api_key: str = ""
-    gemini_vision_model: str = "gemini-2.0-flash"
+    gemini_vision_model: str = "gemini-2.5-flash"
 
     # Email
     resend_api_key: str = ""

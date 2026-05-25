@@ -62,7 +62,7 @@ class GeminiVisionClient:
         if not settings.gemini_api_key:
             raise RuntimeError("GEMINI_API_KEY not set")
 
-        model = getattr(settings, "gemini_vision_model", None) or "gemini-2.0-flash"
+        model = getattr(settings, "gemini_vision_model", None) or "gemini-2.5-flash"
         b64 = base64.b64encode(image_bytes).decode("ascii")
         payload: dict[str, Any] = {
             "contents": [
