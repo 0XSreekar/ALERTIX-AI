@@ -18,8 +18,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.auth.deps import CurrentUser, current_user
 from app.config import get_settings
 from app.db import get_session
+from app.llm.gemini_vision import GeminiVisionClient
+from app.logging import get_logger
 from app.ml.damage_segment import DamageSegmenter
 from app.storage import UploadStorage
+
+log = get_logger(__name__)
 
 router = APIRouter(prefix="/api/damage", tags=["damage"])
 
@@ -89,24 +93,75 @@ async def segment_damage(
         session, content, file.filename or "damage.jpg", user.user_id
     )
 
-    checkpoint = get_settings().damage_model_checkpoint
-    if not checkpoint:
-        await session.commit()
-        raise HTTPException(
-            status_code=503,
-            detail="Damage model checkpoint is not configured. Upload was stored and deduplicated.",
-        )
+    settings = get_settings()
+    checkpoint = settings.damage_model_checkpoint
 
     try:
         image = Image.open(BytesIO(content)).convert("RGB").resize((256, 256))
     except Exception as exc:
         raise HTTPException(status_code=400, detail="Invalid image upload") from exc
 
-    arr = np.asarray(image, dtype=np.float32).transpose(2, 0, 1) / 255.0
-    prediction = DamageSegmenter(checkpoint).predict(arr)
-    model_version = Path(checkpoint).name
+    # Always run the CNN if checkpoint is configured — we want the mask for the
+    # overlay even when Gemini provides the classification.
+    cnn_pred = None
+    if checkpoint:
+        try:
+            arr = np.asarray(image, dtype=np.float32).transpose(2, 0, 1) / 255.0
+            cnn_pred = DamageSegmenter(checkpoint).predict(arr)
+        except Exception:
+            log.exception("damage_cnn_inference_failed")
+
+    # Primary: Gemini Vision (real-image accuracy). Fall back to CNN if unavailable.
+    gemini_result = None
+    if settings.gemini_api_key:
+        try:
+            mime = file.content_type or "image/jpeg"
+            gemini_result = await GeminiVisionClient().analyze_damage(content, mime_type=mime)
+        except Exception:
+            log.warning("damage_gemini_failed_fallback_to_cnn", exc_info=True)
+
+    if gemini_result is None and cnn_pred is None:
+        await session.commit()
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "No damage model available. Configure GEMINI_API_KEY (preferred) or "
+                "DAMAGE_MODEL_CHECKPOINT. Upload was stored and deduplicated."
+            ),
+        )
+
+    if gemini_result is not None:
+        class_label = gemini_result.class_label
+        confidence = gemini_result.confidence
+        class_probs = gemini_result.class_probs
+        description = gemini_result.description
+        visible_hazards = gemini_result.visible_hazards
+        provider = "gemini-vision"
+        model_version = settings.gemini_vision_model
+    else:
+        assert cnn_pred is not None
+        class_label = cnn_pred.class_label
+        confidence = cnn_pred.confidence
+        class_probs = cnn_pred.class_probs
+        description = ""
+        visible_hazards = []
+        provider = "cnn-synthetic"
+        model_version = Path(checkpoint).name if checkpoint else "cnn"
+
+    # Mask + boxes always come from the CNN when available; Gemini doesn't return masks.
+    bounding_boxes = cnn_pred.bounding_boxes if cnn_pred else []
+    mask = cnn_pred.mask if cnn_pred else np.zeros((1, 1), dtype=np.uint8)
+    latency_ms = cnn_pred.latency_ms if cnn_pred else 0.0
 
     nearest = await _find_nearest_event(session, latitude, longitude)
+
+    # Stash description + hazards in the notes column (prepended) so we don't need
+    # another migration. UI strips this prefix back out when listing history.
+    persisted_notes = notes or ""
+    if description:
+        persisted_notes = f"[gemini] {description}\n{persisted_notes}".strip()
+
+    import json as _json
 
     report_id = (
         await session.execute(
@@ -123,15 +178,15 @@ async def segment_damage(
             {
                 "user_id": user.user_id,
                 "sha": stored.sha256,
-                "label": prediction.class_label,
-                "conf": prediction.confidence,
-                "probs": __import__("json").dumps(prediction.class_probs),
-                "boxes": __import__("json").dumps(prediction.bounding_boxes),
+                "label": class_label,
+                "conf": confidence,
+                "probs": _json.dumps(class_probs),
+                "boxes": _json.dumps(bounding_boxes),
                 "ver": model_version,
                 "lat": latitude,
                 "lon": longitude,
                 "nearest": nearest["id"] if nearest else None,
-                "notes": notes,
+                "notes": persisted_notes or None,
             },
         )
     ).scalar_one()
@@ -144,14 +199,17 @@ async def segment_damage(
         "sha256": stored.sha256,
         "image_url": f"/api/damage/reports/{report_id}/image",
         "deduplicated": stored.deduplicated,
-        "class_label": prediction.class_label,
-        "confidence": prediction.confidence,
-        "class_probs": prediction.class_probs,
-        "bounding_boxes": prediction.bounding_boxes,
-        "mask_overlay": _mask_to_png_b64(prediction.mask),
-        "mask_shape": list(prediction.mask.shape),
+        "class_label": class_label,
+        "confidence": confidence,
+        "class_probs": class_probs,
+        "bounding_boxes": bounding_boxes,
+        "mask_overlay": _mask_to_png_b64(mask),
+        "mask_shape": list(mask.shape),
         "model_version": model_version,
-        "latency_ms": round(prediction.latency_ms, 1),
+        "provider": provider,
+        "description": description,
+        "visible_hazards": visible_hazards,
+        "latency_ms": round(latency_ms, 1),
         "nearest_event": nearest,
     }
 

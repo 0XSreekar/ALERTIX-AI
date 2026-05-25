@@ -326,7 +326,44 @@ export default function DamageTab() {
                       <>
                         <ConfidenceMeter value={result.confidence} />
                         <ProbabilityBars probs={result.class_probs} />
+                        {result.description && (
+                          <div className="rounded-md border border-blue-700/40 bg-blue-950/20 p-3 text-sm text-blue-100">
+                            <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-blue-300">
+                              AI description
+                            </p>
+                            <p>{result.description}</p>
+                            {result.visible_hazards.length > 0 && (
+                              <div className="mt-2 flex flex-wrap gap-1">
+                                {result.visible_hazards.map((h) => (
+                                  <span
+                                    key={h}
+                                    className="rounded-full bg-blue-700/30 px-2 py-0.5 text-xs"
+                                  >
+                                    {h.replace(/_/g, " ")}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )}
                         <div className="space-y-1 border-t border-border pt-3 text-xs text-muted-foreground">
+                          <p>
+                            <span className="text-foreground">Provider:</span>{" "}
+                            <span
+                              className={
+                                result.provider === "gemini-vision"
+                                  ? "font-mono font-semibold text-blue-400"
+                                  : "font-mono text-yellow-400"
+                              }
+                            >
+                              {result.provider}
+                            </span>
+                            {result.provider === "cnn-synthetic" && (
+                              <span className="ml-1 text-yellow-500">
+                                (demo model — synthetic training)
+                              </span>
+                            )}
+                          </p>
                           <p>
                             <span className="text-foreground">Model:</span>{" "}
                             <span className="font-mono">{result.model_version}</span>
@@ -402,6 +439,13 @@ export default function DamageTab() {
                         mask_overlay: "",
                         mask_shape: [0, 0],
                         model_version: r.model_version,
+                        provider: r.model_version.includes("gemini")
+                          ? "gemini-vision"
+                          : "cnn-synthetic",
+                        description: r.notes?.startsWith("[gemini] ")
+                          ? r.notes.slice("[gemini] ".length).split("\n")[0]
+                          : "",
+                        visible_hazards: [],
                         latency_ms: 0,
                         nearest_event: null,
                       });

@@ -117,6 +117,9 @@ export interface DamageResult {
   mask_overlay: string;          // data URL
   mask_shape: [number, number];
   model_version: string;
+  provider: "gemini-vision" | "cnn-synthetic" | string;
+  description: string;
+  visible_hazards: string[];
   latency_ms: number;
   nearest_event: DamageNearestEvent | null;
 }
