@@ -7,6 +7,9 @@ import type {
   HazardEvent,
   LandslidePrediction,
   RiskGridResponse,
+  SentinelBriefingResponse,
+  SentinelStreamResponse,
+  SentinelThreat,
   SosReport,
   WildfirePrediction,
 } from "./types";
@@ -132,6 +135,30 @@ export function fetchRiskGrid(
 
 export function fetchLandslidePrediction(lat: number, lon: number) {
   return apiFetch<LandslidePrediction>(`/api/predict/landslide?lat=${lat}&lon=${lon}`);
+}
+
+// ── Sentinel (Live Threat Theatre) ──────────────────────────
+export function fetchSentinelThreats(minutes = 180, limit = 12) {
+  return apiFetch<{ threats: SentinelThreat[]; window_minutes: number }>(
+    `/api/sentinel/threats?minutes=${minutes}&limit=${limit}`,
+  );
+}
+
+export function fetchSentinelStream(opts?: { from?: string; to?: string; limit?: number }) {
+  const qs = new URLSearchParams();
+  if (opts?.from) qs.set("from", opts.from);
+  if (opts?.to) qs.set("to", opts.to);
+  if (opts?.limit) qs.set("limit", String(opts.limit));
+  const s = qs.toString();
+  return apiFetch<SentinelStreamResponse>(`/api/sentinel/stream${s ? "?" + s : ""}`);
+}
+
+export function postSentinelBriefing(question: string, eventIds: string[]) {
+  return apiFetch<SentinelBriefingResponse>("/api/sentinel/brief", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ question, event_ids: eventIds }),
+  });
 }
 
 // ── Contact ─────────────────────────────────────────────────

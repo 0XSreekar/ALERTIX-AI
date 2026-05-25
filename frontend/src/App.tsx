@@ -16,6 +16,7 @@ const LandslideTab = lazy(() => import("@/routes/Dashboard/LandslideTab"));
 const DamageTab = lazy(() => import("@/routes/Dashboard/DamageTab"));
 const SosTab = lazy(() => import("@/routes/Dashboard/SosTab"));
 const AlertsTab = lazy(() => import("@/routes/Dashboard/AlertsTab"));
+const SentinelTab = lazy(() => import("@/routes/Dashboard/SentinelTab"));
 const AdminDashboard = lazy(() => import("@/routes/AdminDashboard"));
 const Unauthorized = lazy(() => import("@/routes/Unauthorized"));
 const NotFound = lazy(() => import("@/routes/NotFound"));
@@ -49,7 +50,8 @@ export default function App() {
             </ProtectedRoute>
           }
         >
-          <Route index element={<Navigate to="earthquake" replace />} />
+          <Route index element={<Navigate to="sentinel" replace />} />
+          <Route path="sentinel" element={<SentinelTab />} />
           <Route path="earthquake" element={<EarthquakeTab />} />
           <Route path="flood" element={<FloodTab />} />
           <Route path="cyclone" element={<CycloneTab />} />

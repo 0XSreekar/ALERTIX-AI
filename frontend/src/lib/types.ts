@@ -151,6 +151,54 @@ export const DAMAGE_LABELS: Record<DamageClass, string> = {
   destroyed: "Destroyed",
 };
 
+// ─── Sentinel ───────────────────────────────────────────────────────────────
+
+export interface SentinelThreat {
+  id: string;
+  hazard_type: string;
+  source: string;
+  occurred_at: string | null;
+  latitude: number;
+  longitude: number;
+  magnitude: number | null;
+  intensity: number | null;
+  metadata: Record<string, unknown>;
+  threat_score: number;
+  title: string;
+}
+
+export interface SentinelStreamEvent {
+  id: string;
+  hazard_type: string;
+  occurred_at: string | null;
+  lat: number;
+  lon: number;
+  mag: number | null;
+  intensity: number | null;
+  meta: Record<string, unknown>;
+}
+
+export interface SentinelStreamResponse {
+  from: string;
+  to: string;
+  events: SentinelStreamEvent[];
+}
+
+export interface SentinelBriefingCitation {
+  short_id: string;
+  event_id: string;
+  hazard_type: string;
+  title: string;
+}
+
+export interface SentinelBriefingResponse {
+  answer: string;
+  citations: SentinelBriefingCitation[];
+  provider: string;
+  model?: string;
+  context_events: number;
+}
+
 export interface RiskGridCell {
   lat: number;
   lon: number;

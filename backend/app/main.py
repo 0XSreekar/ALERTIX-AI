@@ -116,6 +116,7 @@ from app.api.damage import router as damage_router  # noqa: E402
 from app.api.events import router as events_router  # noqa: E402
 from app.api.predict import router as predict_router  # noqa: E402
 from app.api.processing import router as processing_router  # noqa: E402
+from app.api.sentinel import router as sentinel_router  # noqa: E402
 from app.api.sos import router as sos_router  # noqa: E402
 
 app.include_router(auth_router)
@@ -127,6 +128,7 @@ app.include_router(predict_router)
 app.include_router(damage_router)
 app.include_router(contact_router)
 app.include_router(processing_router)
+app.include_router(sentinel_router)
 app.include_router(__import__("app.api.ingestion", fromlist=["router"]).router)
 app.include_router(citizen_reports_router)
 

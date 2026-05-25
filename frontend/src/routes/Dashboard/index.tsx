@@ -5,6 +5,7 @@ import Footer from "@/components/Footer";
 import { cn } from "@/lib/utils";
 
 const tabs = [
+  { path: "sentinel", label: "Sentinel", icon: "🛰️", minRole: "citizen" },
   { path: "earthquake", label: "Earthquake", icon: "🔴", minRole: "citizen" },
   { path: "flood", label: "Flood", icon: "🔵", minRole: "citizen" },
   { path: "cyclone", label: "Cyclone", icon: "🟣", minRole: "citizen" },

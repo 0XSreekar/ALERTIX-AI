@@ -99,6 +99,30 @@ docker compose up --build   # Postgres + Redis + backend + frontend
 `.env.example` documents every variable. Copy to `.env` and fill in. Never commit `.env`.
 Frontend env vars must be prefixed with `VITE_`.
 
+## Phase 3 — Sentinel "Live Threat Theatre"
+
+Single flagship feature replacing the feel of "another dashboard tab." Lives at
+`/dashboard/sentinel`. Active development; not all components are complete.
+
+**Components (each gated by a feature flag; build them in this order):**
+
+| # | Component | Backend | Frontend | Status |
+|---|---|---|---|---|
+| 1 | 3D India globe (Three.js / R3F) | — | `routes/Dashboard/SentinelTab.tsx`, `components/sentinel/Globe.tsx` | building |
+| 2 | Live event particles over WS | reuses `/ws/events` | particle system inside Globe | building |
+| 3 | Top-threats sidebar | `GET /api/sentinel/threats` | `components/sentinel/ThreatList.tsx` | building |
+| 4 | Time slider (-7d → +72h) | reuses `/api/events` with `from`/`to` | `components/sentinel/TimeSlider.tsx` | building |
+| 5 | Forecast cones (cyclone, flood, seismic) | reuses `/api/predict/*` | overlay layer in Globe | pending |
+| 6 | WorldPop population-at-risk | `GET /api/sentinel/impact?event_id=` | drill-down panel | pending |
+| 7 | AI Briefing Bar (Gemini RAG, grounded only on visible events) | `POST /api/sentinel/brief` | `components/sentinel/BriefingBar.tsx` | building |
+| 8 | Cascading hazard graph (force-directed) | `GET /api/sentinel/cascades` | `components/sentinel/CascadeGraph.tsx` | pending |
+| 9 | Drill-down SitRep panel (Gemini-generated, citation-linked) | `POST /api/sentinel/sitrep` | `components/sentinel/SitRepPanel.tsx` | pending |
+
+**Accuracy constraint:** every particle, cone, and number on this surface MUST trace
+to a real DB row or a model we've trained. No demo bezels, no fabricated populations.
+The AI briefing prompt always passes the on-screen event payload as context — Gemini
+must cite event IDs in its response; ungrounded answers are rejected by the frontend.
+
 ## External data sources
 
 USGS (earthquakes), IRIS (waveforms), IMD/RSMC + JTWC (cyclones), NASA FIRMS (wildfires), CWC India (river gauges), official flood bulletins, Open-Meteo (weather/rainfall), GSI (landslide zones), Sentinel-1 (SAR for flood extent). All free for non-commercial use.
