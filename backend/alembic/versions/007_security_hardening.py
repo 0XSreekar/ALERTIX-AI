@@ -17,120 +17,157 @@ branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
 
+def _idx(name: str, table: str, cols: str, *, method: str = "btree") -> None:
+    """CREATE INDEX IF NOT EXISTS — safe for re-runs."""
+    using = f" USING {method}" if method != "btree" else ""
+    op.execute(f"CREATE INDEX IF NOT EXISTS {name} ON {table}{using} ({cols})")
+
+
+def _uq(name: str, table: str, cols: str) -> None:
+    """CREATE UNIQUE INDEX IF NOT EXISTS."""
+    op.execute(f"CREATE UNIQUE INDEX IF NOT EXISTS {name} ON {table} ({cols})")
+
+
 def upgrade() -> None:
-    # ── audit_log: rename columns, add new ones ────────────────────────────
-    with op.batch_alter_table("audit_log") as batch_op:
-        batch_op.alter_column("target_table", new_column_name="entity_type", existing_type=sa.String())
-        batch_op.alter_column("target_id", new_column_name="entity_id", existing_type=UUID(as_uuid=True))
-        batch_op.alter_column("payload", new_column_name="details", existing_type=JSONB())
-        batch_op.add_column(sa.Column("role", sa.String(), nullable=True))
-        batch_op.add_column(sa.Column("ip_hash", sa.String(64), nullable=True))
+    conn = op.get_bind()
 
-    # Indexes on audit_log — IF NOT EXISTS avoids abort inside a single txn
-    op.execute("CREATE INDEX IF NOT EXISTS audit_log_actor_idx ON audit_log (actor_user_id)")
-    op.execute("CREATE INDEX IF NOT EXISTS audit_log_entity_idx ON audit_log (entity_type, entity_id)")
-    op.execute("CREATE INDEX IF NOT EXISTS audit_log_created_idx ON audit_log (created_at)")
+    # ── audit_log: rename columns (idempotent via DO blocks) ──────────────────
+    conn.execute(sa.text("""
+        DO $$ BEGIN
+            IF EXISTS (
+                SELECT 1 FROM information_schema.columns
+                WHERE table_name='audit_log' AND column_name='target_table'
+            ) THEN
+                ALTER TABLE audit_log RENAME COLUMN target_table TO entity_type;
+            END IF;
+        END $$
+    """))
+    conn.execute(sa.text("""
+        DO $$ BEGIN
+            IF EXISTS (
+                SELECT 1 FROM information_schema.columns
+                WHERE table_name='audit_log' AND column_name='target_id'
+            ) THEN
+                ALTER TABLE audit_log RENAME COLUMN target_id TO entity_id;
+            END IF;
+        END $$
+    """))
+    conn.execute(sa.text("""
+        DO $$ BEGIN
+            IF EXISTS (
+                SELECT 1 FROM information_schema.columns
+                WHERE table_name='audit_log' AND column_name='payload'
+            ) THEN
+                ALTER TABLE audit_log RENAME COLUMN payload TO details;
+            END IF;
+        END $$
+    """))
+    conn.execute(sa.text(
+        "ALTER TABLE audit_log ADD COLUMN IF NOT EXISTS role VARCHAR"
+    ))
+    conn.execute(sa.text(
+        "ALTER TABLE audit_log ADD COLUMN IF NOT EXISTS ip_hash VARCHAR(64)"
+    ))
 
-    # ── SOS reports: add status enum column ───────────────────────────────
-    sos_status_enum = sa.Enum(
-        "pending", "triaged", "dispatched", "resolved",
-        name="sos_status",
-        create_constraint=True,
-    )
-    sos_status_enum.create(op.get_bind(), checkfirst=True)
-    op.add_column(
-        "sos_reports",
-        sa.Column(
-            "status",
-            sos_status_enum,
-            nullable=False,
-            server_default="pending",
-        ),
-    )
-    op.execute("CREATE INDEX IF NOT EXISTS sos_status_idx ON sos_reports (status)")
+    # Indexes on audit_log
+    _idx("audit_log_actor_idx",  "audit_log", "actor_user_id")
+    _idx("audit_log_entity_idx", "audit_log", "entity_type, entity_id")
+    _idx("audit_log_created_idx","audit_log", "created_at")
 
-    # ── Missing / supplemental indexes ────────────────────────────────────
-    op.execute("CREATE INDEX IF NOT EXISTS hazard_events_created_idx ON hazard_events (created_at DESC)")
+    # ── SOS reports: add status enum + column ────────────────────────────────
+    conn.execute(sa.text("""
+        DO $$ BEGIN
+            IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'sos_status') THEN
+                CREATE TYPE sos_status AS ENUM ('pending','triaged','dispatched','resolved');
+            END IF;
+        END $$
+    """))
+    conn.execute(sa.text("""
+        ALTER TABLE sos_reports
+            ADD COLUMN IF NOT EXISTS status sos_status NOT NULL DEFAULT 'pending'
+    """))
+    _idx("sos_status_idx",  "sos_reports", "status")
+    _idx("sos_created_idx", "sos_reports", "created_at DESC")
 
-    # earthquakes
-    op.execute(
-        "DO $$ BEGIN "
-        "  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'uq_earthquakes_source_external_id') THEN "
-        "    ALTER TABLE earthquakes ADD CONSTRAINT uq_earthquakes_source_external_id UNIQUE (source, external_id); "
-        "  END IF; "
-        "END $$"
-    )
-    op.execute("CREATE INDEX IF NOT EXISTS earthquakes_created_idx ON earthquakes (occurred_at DESC)")
-    op.execute("CREATE INDEX IF NOT EXISTS earthquakes_location_gist_idx ON earthquakes USING gist (location)")
+    # ── Performance indexes ───────────────────────────────────────────────────
+    _idx("hazard_events_created_idx",      "hazard_events", "created_at DESC")
 
-    # wildfires
-    op.execute(
-        "DO $$ BEGIN "
-        "  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'uq_wildfires_source_external_id') THEN "
-        "    ALTER TABLE wildfires ADD CONSTRAINT uq_wildfires_source_external_id UNIQUE (source, external_id); "
-        "  END IF; "
-        "END $$"
-    )
-    op.execute("CREATE INDEX IF NOT EXISTS wildfires_created_idx ON wildfires (detected_at DESC)")
-    op.execute("CREATE INDEX IF NOT EXISTS wildfires_location_gist_idx ON wildfires USING gist (location)")
+    _uq("uq_earthquakes_source_external_id", "earthquakes", "source, external_id")
+    _idx("earthquakes_created_idx",          "earthquakes", "occurred_at DESC")
+    _idx("earthquakes_location_gist_idx",    "earthquakes", "location", method="gist")
 
-    # river_gauges (003 already creates river_gauges_observed_idx — IF NOT EXISTS is safe)
-    op.execute("CREATE INDEX IF NOT EXISTS river_gauges_observed_idx ON river_gauges (observed_at DESC)")
-    op.execute("CREATE INDEX IF NOT EXISTS river_gauges_location_gist_idx ON river_gauges USING gist (location)")
+    _uq("uq_wildfires_source_external_id",   "wildfires",  "source, external_id")
+    _idx("wildfires_created_idx",            "wildfires",  "detected_at DESC")
+    _idx("wildfires_location_gist_idx",      "wildfires",  "location", method="gist")
 
-    # weather_events (003 already creates weather_events_observed_idx — IF NOT EXISTS is safe)
-    op.execute(
-        "DO $$ BEGIN "
-        "  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'uq_weather_events_source_external_id') THEN "
-        "    ALTER TABLE weather_events ADD CONSTRAINT uq_weather_events_source_external_id UNIQUE (source, external_id); "
-        "  END IF; "
-        "END $$"
-    )
-    op.execute("CREATE INDEX IF NOT EXISTS weather_events_observed_idx ON weather_events (observed_at DESC)")
-    op.execute("CREATE INDEX IF NOT EXISTS weather_events_location_gist_idx ON weather_events USING gist (location)")
+    # river_gauges — river_gauges_observed_idx already exists from migration 003
+    _idx("river_gauges_observed_idx",        "river_gauges", "observed_at DESC")
+    _idx("river_gauges_location_gist_idx",   "river_gauges", "location", method="gist")
 
-    # alerts
-    op.execute("CREATE INDEX IF NOT EXISTS alerts_created_desc_idx ON alerts (created_at DESC)")
+    _uq("uq_weather_events_source_external_id", "weather_events", "source, external_id")
+    # weather_events_observed_idx already exists from migration 003
+    _idx("weather_events_observed_idx",      "weather_events", "observed_at DESC")
+    _idx("weather_events_location_gist_idx", "weather_events", "location", method="gist")
 
-    # sos_reports: created_at DESC
-    op.execute("CREATE INDEX IF NOT EXISTS sos_created_idx ON sos_reports (created_at DESC)")
+    _idx("alerts_created_desc_idx", "alerts", "created_at DESC")
 
 
 def downgrade() -> None:
-    # Drop extra table indexes
     for idx, tbl in [
-        ("hazard_events_created_idx", "hazard_events"),
-        ("earthquakes_created_idx", "earthquakes"),
-        ("earthquakes_location_gist_idx", "earthquakes"),
-        ("wildfires_created_idx", "wildfires"),
-        ("wildfires_location_gist_idx", "wildfires"),
-        ("river_gauges_observed_idx", "river_gauges"),
-        ("river_gauges_location_gist_idx", "river_gauges"),
-        ("weather_events_observed_idx", "weather_events"),
-        ("weather_events_location_gist_idx", "weather_events"),
+        ("alerts_created_desc_idx",              "alerts"),
+        ("weather_events_location_gist_idx",     "weather_events"),
+        ("weather_events_observed_idx",          "weather_events"),
+        ("river_gauges_location_gist_idx",       "river_gauges"),
+        ("wildfires_location_gist_idx",          "wildfires"),
+        ("wildfires_created_idx",                "wildfires"),
+        ("earthquakes_location_gist_idx",        "earthquakes"),
+        ("earthquakes_created_idx",              "earthquakes"),
+        ("hazard_events_created_idx",            "hazard_events"),
+        ("sos_created_idx",                      "sos_reports"),
+        ("sos_status_idx",                       "sos_reports"),
+        ("audit_log_created_idx",                "audit_log"),
+        ("audit_log_entity_idx",                 "audit_log"),
+        ("audit_log_actor_idx",                  "audit_log"),
     ]:
-        try:
-            op.drop_index(idx, table_name=tbl)
-        except Exception:
-            pass
+        op.execute(f"DROP INDEX IF EXISTS {idx}")
 
-    # sos_reports
-    op.drop_index("sos_created_idx", table_name="sos_reports")
-    op.drop_index("sos_status_idx", table_name="sos_reports")
-    op.drop_column("sos_reports", "status")
-    sa.Enum(name="sos_status").drop(op.get_bind(), checkfirst=True)
+    op.execute("ALTER TABLE sos_reports DROP COLUMN IF EXISTS status")
+    op.execute("DROP TYPE IF EXISTS sos_status")
 
-    # audit_log
-    op.drop_index("audit_log_created_idx", table_name="audit_log")
-    op.drop_index("audit_log_entity_idx", table_name="audit_log")
-    op.drop_index("audit_log_actor_idx", table_name="audit_log")
-    with op.batch_alter_table("audit_log") as batch_op:
-        batch_op.drop_column("ip_hash")
-        batch_op.drop_column("role")
-        batch_op.alter_column("details", new_column_name="payload", existing_type=JSONB())
-        batch_op.alter_column(
-            "entity_id",
-            new_column_name="target_id",
-            existing_type=UUID(as_uuid=True),
-        )
-        batch_op.alter_column("entity_type", new_column_name="target_table", existing_type=sa.String())
+    conn = op.get_bind()
+    conn.execute(sa.text(
+        "ALTER TABLE audit_log DROP COLUMN IF EXISTS ip_hash"
+    ))
+    conn.execute(sa.text(
+        "ALTER TABLE audit_log DROP COLUMN IF EXISTS role"
+    ))
+    conn.execute(sa.text("""
+        DO $$ BEGIN
+            IF EXISTS (
+                SELECT 1 FROM information_schema.columns
+                WHERE table_name='audit_log' AND column_name='details'
+            ) THEN
+                ALTER TABLE audit_log RENAME COLUMN details TO payload;
+            END IF;
+        END $$
+    """))
+    conn.execute(sa.text("""
+        DO $$ BEGIN
+            IF EXISTS (
+                SELECT 1 FROM information_schema.columns
+                WHERE table_name='audit_log' AND column_name='entity_id'
+            ) THEN
+                ALTER TABLE audit_log RENAME COLUMN entity_id TO target_id;
+            END IF;
+        END $$
+    """))
+    conn.execute(sa.text("""
+        DO $$ BEGIN
+            IF EXISTS (
+                SELECT 1 FROM information_schema.columns
+                WHERE table_name='audit_log' AND column_name='entity_type'
+            ) THEN
+                ALTER TABLE audit_log RENAME COLUMN entity_type TO target_table;
+            END IF;
+        END $$
+    """))

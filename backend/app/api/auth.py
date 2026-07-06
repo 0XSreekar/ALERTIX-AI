@@ -1,5 +1,10 @@
 """Local auth endpoints — POST /api/auth/signup, /api/auth/login, /api/auth/me.
-Uses bcrypt + HS256 JWT. No Supabase required for local dev."""
+
+Issues a bcrypt-checked HS256 JWT in an HttpOnly, SameSite=Lax cookie
+(`alertix_token`). For WebSocket upgrades the browser cannot rely on the
+cookie cross-origin, so /api/auth/ws-ticket exchanges the cookie for a
+short-lived (60s) bearer token the frontend appends to ?token=.
+"""
 
 from __future__ import annotations
 
@@ -10,15 +15,18 @@ from typing import Annotated
 
 import bcrypt
 import jwt
-from fastapi import APIRouter, Depends, Header, HTTPException, Response
+from fastapi import APIRouter, Cookie, Depends, Header, HTTPException, Response
 from pydantic import BaseModel
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.config import get_jwt_secret
+from app.config import get_jwt_secret, get_settings
 from app.db import get_session
 from app.logging import get_logger
 from app.redis_client import get_redis
+
+AUTH_COOKIE_NAME = "alertix_token"
+_WS_TICKET_TTL_SECONDS = 60
 
 log = get_logger(__name__)
 
@@ -42,16 +50,54 @@ JWT_ALGORITHM = "HS256"
 JWT_EXPIRE_HOURS = 72
 
 
-def _make_token(user_id: str, email: str, role: str) -> str:
+def _make_token(
+    user_id: str,
+    email: str,
+    role: str,
+    *,
+    expires_in: timedelta | None = None,
+    scope: str = "session",
+) -> str:
+    """Issue a signed HS256 JWT. `scope=session` is the standard auth token;
+    `scope=ws` is a short-lived ticket used to authenticate WebSocket upgrades."""
     secret = get_jwt_secret()
+    ttl = expires_in or timedelta(hours=JWT_EXPIRE_HOURS)
     payload = {
         "sub": user_id,
         "email": email,
         "role": role,
-        "exp": datetime.now(UTC) + timedelta(hours=JWT_EXPIRE_HOURS),
+        "scope": scope,
+        "exp": datetime.now(UTC) + ttl,
         "iat": datetime.now(UTC),
     }
     return jwt.encode(payload, secret, algorithm=JWT_ALGORITHM)
+
+
+def _set_auth_cookie(response: Response, token: str) -> None:
+    """Set the auth cookie. HttpOnly so JS cannot read it (mitigates XSS token theft).
+    Secure in production; SameSite=Lax allows normal navigations but blocks CSRF
+    from cross-site form posts."""
+    settings = get_settings()
+    response.set_cookie(
+        key=AUTH_COOKIE_NAME,
+        value=token,
+        max_age=JWT_EXPIRE_HOURS * 3600,
+        httponly=True,
+        secure=settings.is_production,
+        samesite="lax",
+        path="/",
+    )
+
+
+def _clear_auth_cookie(response: Response) -> None:
+    settings = get_settings()
+    response.delete_cookie(
+        key=AUTH_COOKIE_NAME,
+        path="/",
+        httponly=True,
+        secure=settings.is_production,
+        samesite="lax",
+    )
 
 
 def _validate_password_strength(password: str) -> None:
@@ -132,7 +178,11 @@ class AuthResponse(BaseModel):
 
 
 @router.post("/signup", response_model=AuthResponse)
-async def signup(body: SignupRequest, session: AsyncSession = Depends(get_session)) -> AuthResponse:
+async def signup(
+    body: SignupRequest,
+    response: Response,
+    session: AsyncSession = Depends(get_session),
+) -> AuthResponse:
     # Validate password strength before anything else
     _validate_password_strength(body.password)
 
@@ -148,15 +198,23 @@ async def signup(body: SignupRequest, session: AsyncSession = Depends(get_sessio
     hashed = _hash(body.password)
     role = "citizen"
 
-    conn = await session.connection()
-    await conn.exec_driver_sql(
-        "INSERT INTO profiles (user_id, email, full_name, role, password_hash) "
-        "VALUES ($1, $2, $3, $4, $5)",
-        (user_id, body.email.lower(), body.full_name, role, hashed),
+    await session.execute(
+        text(
+            "INSERT INTO profiles (user_id, email, full_name, role, password_hash) "
+            "VALUES (:user_id, :email, :full_name, :role, :password_hash)"
+        ),
+        {
+            "user_id": user_id,
+            "email": body.email.lower(),
+            "full_name": body.full_name,
+            "role": role,
+            "password_hash": hashed,
+        },
     )
     await session.commit()
 
     token = _make_token(user_id, body.email.lower(), role)
+    _set_auth_cookie(response, token)
     return AuthResponse(
         access_token=token,
         user_id=user_id,
@@ -193,6 +251,7 @@ async def login(
     await _clear_failed_logins(body.email.lower())
 
     token = _make_token(str(row.user_id), row.email, row.role)
+    _set_auth_cookie(response, token)
     return AuthResponse(
         access_token=token,
         user_id=str(row.user_id),
@@ -213,12 +272,13 @@ class MeResponse(BaseModel):
 async def me(
     session: AsyncSession = Depends(get_session),
     authorization: Annotated[str | None, Header()] = None,
+    alertix_token: Annotated[str | None, Cookie()] = None,
 ) -> MeResponse:
     from app.auth.deps import _decode_jwt, _extract_bearer, _from_payload
 
-    token = _extract_bearer(authorization)
+    token = _extract_bearer(authorization) or alertix_token
     if not token:
-        raise HTTPException(status_code=401, detail="Missing bearer token")
+        raise HTTPException(status_code=401, detail="Not authenticated")
     payload = _decode_jwt(token)
     user = _from_payload(payload)
 
@@ -233,3 +293,45 @@ async def me(
         role=user.role,
         full_name=row.full_name if row else "",
     )
+
+
+@router.post("/logout")
+async def logout(response: Response) -> dict:
+    """Clear the auth cookie. Idempotent — safe to call when already logged out."""
+    _clear_auth_cookie(response)
+    return {"status": "logged_out"}
+
+
+class WsTicketResponse(BaseModel):
+    token: str
+    expires_in: int
+
+
+@router.post("/ws-ticket", response_model=WsTicketResponse)
+async def ws_ticket(
+    authorization: Annotated[str | None, Header()] = None,
+    alertix_token: Annotated[str | None, Cookie()] = None,
+) -> WsTicketResponse:
+    """Exchange the session cookie for a 60s WebSocket auth ticket.
+
+    Browsers don't send cookies on cross-origin WS handshakes reliably, so
+    the frontend calls this first then appends ?token=<ticket> to the WS URL.
+    The ticket has scope='ws' and a 60s TTL so it can't be replayed for HTTP."""
+    from app.auth.deps import _decode_jwt, _extract_bearer, _from_payload
+
+    token = _extract_bearer(authorization) or alertix_token
+    if not token:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    payload = _decode_jwt(token)
+    if payload.get("scope") == "ws":
+        # Don't let a ws ticket mint another ws ticket — must come from session token
+        raise HTTPException(status_code=403, detail="Cannot mint ticket from ws ticket")
+    user = _from_payload(payload)
+    ticket = _make_token(
+        user.user_id,
+        user.email or "",
+        user.role,
+        expires_in=timedelta(seconds=_WS_TICKET_TTL_SECONDS),
+        scope="ws",
+    )
+    return WsTicketResponse(token=ticket, expires_in=_WS_TICKET_TTL_SECONDS)

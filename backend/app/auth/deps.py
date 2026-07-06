@@ -6,9 +6,11 @@ from dataclasses import dataclass
 from typing import Annotated
 
 import jwt
-from fastapi import Depends, Header, HTTPException, status
+from fastapi import Cookie, Depends, Header, HTTPException, status
 
 from app.config import get_jwt_secret, get_settings
+
+AUTH_COOKIE_NAME = "alertix_token"
 
 
 @dataclass(frozen=True)
@@ -55,21 +57,33 @@ def _from_payload(payload: dict) -> CurrentUser:
 
 async def current_user(
     authorization: Annotated[str | None, Header()] = None,
+    alertix_token: Annotated[str | None, Cookie()] = None,
 ) -> CurrentUser:
-    token = _extract_bearer(authorization)
+    token = _extract_bearer(authorization) or alertix_token
     if not token:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing bearer token")
-    return _from_payload(_decode_jwt(token))
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
+    payload = _decode_jwt(token)
+    # Session cookies/headers must use the default 'session' scope; the 60s
+    # ws-tickets are scope='ws' and only valid for WebSocket upgrades.
+    if payload.get("scope", "session") != "session":
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Wrong token scope for HTTP API"
+        )
+    return _from_payload(payload)
 
 
 async def current_user_optional(
     authorization: Annotated[str | None, Header()] = None,
+    alertix_token: Annotated[str | None, Cookie()] = None,
 ) -> CurrentUser | None:
-    token = _extract_bearer(authorization)
+    token = _extract_bearer(authorization) or alertix_token
     if not token:
         return None
     try:
-        return _from_payload(_decode_jwt(token))
+        payload = _decode_jwt(token)
+        if payload.get("scope", "session") != "session":
+            return None
+        return _from_payload(payload)
     except HTTPException:
         return None
 

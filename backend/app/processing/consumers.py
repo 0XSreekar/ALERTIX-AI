@@ -12,6 +12,7 @@ from redis.asyncio import Redis
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import get_settings
 from app.ingestion.common.stream import HAZARD_EVENTS_STREAM
 from app.logging import get_logger
 from app.processing.events import ProcessingEvent
@@ -20,6 +21,7 @@ from app.processing.risk import score_event
 from app.processing.state import AlertTier, ProcessingState, assert_next_state
 
 log = get_logger(__name__)
+settings = get_settings()
 
 PROCESSING_RETRY_STREAM = "hazard:events:retry"
 PROCESSING_DLQ_STREAM = "hazard:events:dlq"
@@ -105,6 +107,8 @@ class HazardConsumer:
                 "risk_score": str(event.risk_score),
                 "payload": json.dumps(event.raw_payload, default=str),
             },
+            maxlen=settings.redis_stream_maxlen,
+            approximate=True,
         )
 
     async def emit_alert(self, event: ProcessingEvent) -> None:
@@ -168,6 +172,8 @@ class HazardConsumer:
                 "reason": reason,
                 "payload": json.dumps(asdict(event), default=str),
             },
+            maxlen=settings.redis_stream_maxlen,
+            approximate=True,
         )
 
     async def move_to_dlq(self, event: ProcessingEvent, reason: str) -> None:
@@ -183,6 +189,8 @@ class HazardConsumer:
                 "reason": reason,
                 "payload": json.dumps(asdict(event), default=str),
             },
+            maxlen=settings.redis_stream_maxlen,
+            approximate=True,
         )
 
     def _advance(self, event: ProcessingEvent, next_state: ProcessingState) -> None:
@@ -224,18 +232,33 @@ class HazardConsumer:
     async def run_forever(self, block_ms: int = 5000) -> None:
         if self.redis is None:
             raise RuntimeError("redis client required for stream consumer")
-        last_id = "$"
+        try:
+            await self.redis.xgroup_create(
+                HAZARD_EVENTS_STREAM,
+                self.group_name,
+                id="0",
+                mkstream=True,
+            )
+        except Exception as exc:
+            if "BUSYGROUP" not in str(exc):
+                raise
         while True:
-            response: list[Any] = await self.redis.xread(
-                {HAZARD_EVENTS_STREAM: last_id}, count=25, block=block_ms
+            response: list[Any] = await self.redis.xreadgroup(
+                self.group_name,
+                self.consumer_name,
+                {HAZARD_EVENTS_STREAM: ">"},
+                count=25,
+                block=block_ms,
             )
             for _, entries in response:
                 for stream_id, payload in entries:
-                    last_id = stream_id
                     event = ProcessingEvent.from_stream(stream_id, payload)
                     if self.hazard_type != "generic" and event.hazard_type != self.hazard_type:
                         continue
                     await self.process_event(event)
+                    if self.session is not None:
+                        await self.session.commit()
+                    await self.redis.xack(HAZARD_EVENTS_STREAM, self.group_name, stream_id)
             await asyncio.sleep(0)
 
 

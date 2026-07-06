@@ -17,15 +17,10 @@ import type {
   SosReport,
   WildfirePrediction,
 } from "./types";
-import { getToken, clearSession, checkTokenExpiry } from "./localAuth";
+import { clearSession } from "./localAuth";
 import { cacheAlerts, queueCitizenReport } from "./offline";
 
 const BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
-
-function authHeaders(): Record<string, string> {
-  const token = getToken();
-  return token ? { Authorization: `Bearer ${token}` } : {};
-}
 
 /** Fires a toast-like notification using the global toast queue (if available). */
 function notifySessionExpired() {
@@ -34,17 +29,22 @@ function notifySessionExpired() {
 }
 
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
-  // Check token expiry before every API call
-  checkTokenExpiry();
-
-  const headers = { ...authHeaders(), ...init?.headers };
-  const res = await fetch(`${BASE}${path}`, { ...init, headers });
+  // The JWT lives in an HttpOnly cookie — `credentials: 'include'` sends it.
+  // Per CORS spec this requires the backend's CORS_ORIGINS to list this exact
+  // origin (no wildcard), which main.py already enforces.
+  const res = await fetch(`${BASE}${path}`, {
+    credentials: "include",
+    ...init,
+    headers: { ...init?.headers },
+  });
 
   if (res.status === 401) {
     clearSession();
     notifySessionExpired();
     // Redirect to /login — works inside and outside React Router context
-    window.location.href = "/login";
+    if (!window.location.pathname.startsWith("/login")) {
+      window.location.href = "/login";
+    }
     throw new Error("Session expired");
   }
 

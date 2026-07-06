@@ -6,12 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import HazardDisclaimer from "@/components/HazardDisclaimer";
 
 const BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
-
-function getAuthToken(): string | null {
-  return localStorage.getItem("alertix_token");
-}
 
 export default function SosTab() {
   const [text, setText] = useState("");
@@ -33,7 +30,6 @@ export default function SosTab() {
   /** Upload file against an existing SOS report (post-create). */
   const uploadAttachmentWithProgress = (sosId: string, f: File): Promise<void> => {
     return new Promise((resolve, reject) => {
-      const token = getAuthToken();
       const xhr = new XMLHttpRequest();
       const form = new FormData();
       form.append("file", f);
@@ -54,8 +50,8 @@ export default function SosTab() {
 
       xhr.onerror = () => reject(new Error("Upload network error"));
 
+      xhr.withCredentials = true; // send HttpOnly auth cookie
       xhr.open("POST", `${BASE}/api/sos/mine/${sosId}/attachment`);
-      if (token) xhr.setRequestHeader("Authorization", `Bearer ${token}`);
       xhr.send(form);
     });
   };
@@ -71,7 +67,6 @@ export default function SosTab() {
     try {
       setStatus("sending");
 
-      const token = getAuthToken();
       const body = {
         raw_text: text,
         latitude: lat ? parseFloat(lat) : undefined,
@@ -81,10 +76,8 @@ export default function SosTab() {
 
       const res = await fetch(`${BASE}/api/sos`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
 
@@ -139,6 +132,7 @@ export default function SosTab() {
   return (
     <div className="space-y-6">
       <h2 className="text-2xl font-bold">SOS Reports</h2>
+      <HazardDisclaimer hazard="sos" />
 
       <div className="rounded-md border border-cyan-700/30 bg-cyan-950/20 p-3 text-xs text-cyan-100">
         <p className="mb-1 font-semibold uppercase tracking-wider text-cyan-300">

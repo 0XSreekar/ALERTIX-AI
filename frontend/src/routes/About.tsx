@@ -62,10 +62,10 @@ export default function About() {
         <section>
           <h2 className="mb-4 text-2xl font-semibold">Technology</h2>
           <p className="text-muted-foreground">
-            Python 3.11 + FastAPI backend, React + TypeScript + Vite frontend, Supabase
-            Postgres + PostGIS database, Upstash Redis for cache and real-time messaging,
-            Cloudflare R2 for object storage. ML powered by PyTorch, scikit-learn, and XGBoost.
-            Local LLM: Qwen2.5-7B-Instruct via Ollama with Groq and Gemini fallbacks.
+            Python 3.11 + FastAPI backend with bcrypt + HS256 JWT auth, React + TypeScript +
+            Vite frontend, Postgres + PostGIS database, Upstash Redis for cache and real-time
+            messaging, Cloudflare R2 for object storage. ML powered by PyTorch, scikit-learn,
+            and XGBoost. Local LLM: Qwen2.5-7B-Instruct via Ollama with Groq and Gemini fallbacks.
           </p>
         </section>
       </main>

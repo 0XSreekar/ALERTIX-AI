@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import HazardMap from "@/components/Map";
+import HazardDisclaimer from "@/components/HazardDisclaimer";
 import RiskGauge from "@/components/RiskGauge";
 import WsStatusBadge from "@/components/WsStatusBadge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -50,12 +51,7 @@ export default function EarthquakeTab() {
         </div>
       </div>
 
-      {/* Disclaimer */}
-      <div className="rounded-lg border border-yellow-600/30 bg-yellow-600/5 p-3 text-xs text-yellow-300">
-        Alertix AI does not perform deterministic earthquake prediction. Values shown represent
-        statistical anomaly scores and aftershock probabilities derived from recent seismicity.
-        Always follow official warnings from NCS and IMD.
-      </div>
+      <HazardDisclaimer hazard="earthquake" />
 
       {/* Map */}
       {isLoading ? (

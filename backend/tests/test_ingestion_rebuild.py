@@ -93,8 +93,10 @@ async def test_publish_hazard_events_writes_required_stream_fields(monkeypatch):
         def __init__(self) -> None:
             self.entries = []
 
-        def xadd(self, stream_name, payload):
+        def xadd(self, stream_name, payload, maxlen=None, approximate=True):
             self.entries.append((stream_name, payload))
+            assert maxlen is not None
+            assert approximate is True
 
         async def execute(self):
             return ["1-0"]

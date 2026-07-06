@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import HazardMap from "@/components/Map";
+import HazardDisclaimer from "@/components/HazardDisclaimer";
 import RiskGauge from "@/components/RiskGauge";
 import { fetchLandslidePrediction, fetchRecentEvents } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -50,6 +51,7 @@ export default function LandslideTab() {
   return (
     <div className="space-y-6">
       <h2 className="text-2xl font-bold">Landslide Risk</h2>
+      <HazardDisclaimer hazard="landslide" />
       <p className="text-sm text-muted-foreground">
         GSI landslide hazard zonation overlaid with IMD intensity-duration rainfall
         threshold rules. Rainfall data sourced live from Open-Meteo.

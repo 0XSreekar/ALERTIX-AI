@@ -39,7 +39,7 @@ class FloodLSTM:
     ) -> None:
         torch, nn = _torch()
 
-        class _Model(nn.Module):
+        class _Model(nn.Module):  # type: ignore[name-defined]
             def __init__(self) -> None:
                 super().__init__()
                 self.lstm = nn.LSTM(
@@ -47,7 +47,7 @@ class FloodLSTM:
                 )
                 self.head = nn.Sequential(nn.Linear(hidden_size, 32), nn.ReLU(), nn.Linear(32, 3))
 
-            def forward(self, x):  # type: ignore[no-untyped-def]
+            def forward(self, x):
                 output, _ = self.lstm(x)
                 return self.head(output[:, -1, :])
 

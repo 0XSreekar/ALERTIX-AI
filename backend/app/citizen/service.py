@@ -93,6 +93,8 @@ async def get_reputation(session: AsyncSession, user_id: str) -> Reputation:
                 {"user_id": user_id},
             )
         ).fetchone()
+    if row is None:
+        return Reputation(score=50, tier="normal", verified_count=0, rejected_count=0)
     score = int(row.score)
     return Reputation(
         score=score,
@@ -165,6 +167,8 @@ async def create_report(
         },
     )
     row = result.fetchone()
+    if row is None:
+        raise RuntimeError("INSERT ... RETURNING returned no row")
     return {
         "id": row.id,
         "hazard_type": row.hazard_type,

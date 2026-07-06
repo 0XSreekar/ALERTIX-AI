@@ -42,7 +42,7 @@ class FloodUNet:
                 nn.ReLU(inplace=True),
             )
 
-        class _UNet(nn.Module):
+        class _UNet(nn.Module):  # type: ignore[name-defined]
             def __init__(self) -> None:
                 super().__init__()
                 self.enc1 = block(in_channels, 32)
@@ -56,7 +56,7 @@ class FloodUNet:
                 self.dec1 = block(64, 32)
                 self.out = nn.Conv2d(32, 1, kernel_size=1)
 
-            def forward(self, x):  # type: ignore[no-untyped-def]
+            def forward(self, x):
                 e1 = self.enc1(x)
                 e2 = self.enc2(self.pool1(e1))
                 mid = self.mid(self.pool2(e2))

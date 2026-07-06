@@ -7,6 +7,11 @@ import httpx
 from app.config import get_settings
 from app.ingestion.common.cache import AsyncTTLCache
 from app.ingestion.common.retry_handler import RetryConfig, retry_async
+from app.ingestion.flood.parser import detect_schema_drift
+from app.ingestion.metrics import metrics as ingest_metrics
+from app.logging import get_logger
+
+log = get_logger(__name__)
 
 _html_cache: AsyncTTLCache[str] = AsyncTTLCache(ttl_seconds=120)
 
@@ -33,7 +38,29 @@ async def fetch_html(url: str) -> str:
 
 async def fetch_cwc_dashboard() -> str:
     settings = get_settings()
-    return await fetch_html(settings.cwc_flood_dashboard_url)
+    html = await fetch_html(settings.cwc_flood_dashboard_url)
+    drift, recognised = detect_schema_drift(html)
+    if drift:
+        # CWC has renamed columns / changed layout. Surface to logs +
+        # ingestion metrics so on-call can update the parser fixture.
+        log.warning(
+            "cwc_schema_drift_detected",
+            url=settings.cwc_flood_dashboard_url,
+            recognised_tokens=sorted(recognised),
+            byte_size=len(html),
+        )
+        ingest_metrics.record(
+            "cwc",
+            fetched=0,
+            parsed=0,
+            valid=0,
+            malformed=0,
+            duplicates=0,
+            stored=0,
+            streamed=0,
+            schema_drift=1,
+        )
+    return html
 
 
 async def fetch_state_bulletins() -> list[tuple[str, str]]:

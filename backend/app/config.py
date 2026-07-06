@@ -5,6 +5,7 @@ from typing import Literal
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 _DEV_JWT_SECRET = "local-dev-secret-change-in-prod"
+_DEV_CRON_TOKEN = "dev-cron-token-replace-me"
 
 
 class Settings(BaseSettings):
@@ -24,6 +25,8 @@ class Settings(BaseSettings):
     database_url_sync: str = "postgresql+psycopg2://postgres:postgres@localhost:5432/alertix"
     db_max_connections: int = 20
     db_pool_min_size: int = 1
+    db_pool_timeout: int = 30
+    db_pool_recycle_seconds: int = 1800
     db_read_replica_url: str | None = None
 
     # Model & ML settings
@@ -40,15 +43,23 @@ class Settings(BaseSettings):
     # Redis / ingestion resilience
     redis_retry_attempts: int = 5
     redis_retry_backoff_ms: int = 200
+    redis_stream_group: str = "alertix-processing"
+    redis_stream_consumer: str = "processor-1"
+    redis_stream_pending_idle_ms: int = 60000
+    redis_stream_maxlen: int = 250000
 
     redis_url: str = "redis://localhost:6379/0"
 
-    supabase_url: str = ""
-    supabase_anon_key: str = ""
-    supabase_service_role_key: str = ""
+    # Hot-table retention defaults. Apply with an operational job, not at request time.
+    event_retention_days: int = 180
+    audit_retention_days: int = 365
+
+    # JWT signing secret for local FastAPI auth.
+    # Historical env-var name kept as SUPABASE_JWT_SECRET so existing deployments
+    # don't break; the project no longer uses Supabase Auth.
     supabase_jwt_secret: str = ""
 
-    cron_token: str = "dev-cron-token-replace-me"
+    cron_token: str = _DEV_CRON_TOKEN
 
     cors_origins: str = "http://localhost:5173"
 
@@ -114,19 +125,48 @@ class Settings(BaseSettings):
     def is_production(self) -> bool:
         return self.app_env == "production"
 
+    @property
+    def db_pool_size(self) -> int:
+        return max(1, min(self.db_pool_min_size, self.db_max_connections))
+
+    @property
+    def db_max_overflow(self) -> int:
+        return max(0, self.db_max_connections - self.db_pool_size)
+
+    def _is_dev(self) -> bool:
+        return (
+            self.app_env == "development"
+            or os.getenv("ENVIRONMENT", "").lower() == "development"
+        )
+
     def validate_jwt_secret(self) -> None:
         """Raise RuntimeError if JWT secret is unsafe in non-development environments."""
+        if self._is_dev():
+            return
         secret = self.supabase_jwt_secret
-        is_dev = (
-            self.app_env == "development" or os.getenv("ENVIRONMENT", "").lower() == "development"
-        )
-        if not is_dev:
-            if not secret or secret == _DEV_JWT_SECRET:
-                raise RuntimeError(
-                    "SUPABASE_JWT_SECRET must be set to a secure random string in "
-                    f"non-development environments (app_env={self.app_env!r}). "
-                    "Set ENVIRONMENT=development to bypass this check only in local dev."
-                )
+        if not secret or secret == _DEV_JWT_SECRET or len(secret) < 32:
+            raise RuntimeError(
+                "SUPABASE_JWT_SECRET must be set to a secure random string (>=32 chars) "
+                f"in non-development environments (app_env={self.app_env!r}). "
+                "Set ENVIRONMENT=development to bypass this check only in local dev."
+            )
+
+    def validate_cron_token(self) -> None:
+        """Raise RuntimeError if CRON_TOKEN is unsafe in non-development environments."""
+        if self._is_dev():
+            return
+        token = self.cron_token
+        if not token or token == _DEV_CRON_TOKEN or len(token) < 24:
+            raise RuntimeError(
+                "CRON_TOKEN must be set to a secure random string (>=24 chars) in "
+                f"non-development environments (app_env={self.app_env!r}). "
+                "Internal /internal/* endpoints would otherwise be exposed to anyone."
+            )
+
+    def validate_startup_secrets(self) -> None:
+        """Validate all secrets that gate authentication. Call from app lifespan."""
+        self.validate_jwt_secret()
+        self.validate_cron_token()
 
 
 @lru_cache(maxsize=1)

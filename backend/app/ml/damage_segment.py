@@ -39,7 +39,7 @@ class DamageSegmenter:
     def __init__(self, checkpoint: str | Path | None = None) -> None:
         torch, nn = _torch()
 
-        class _Model(nn.Module):
+        class _Model(nn.Module):  # type: ignore[name-defined]
             def __init__(self) -> None:
                 super().__init__()
                 self.features = nn.Sequential(
@@ -59,7 +59,7 @@ class DamageSegmenter:
                 )
                 self.mask_head = nn.Conv2d(96, 1, kernel_size=1)
 
-            def forward(self, x):  # type: ignore[no-untyped-def]
+            def forward(self, x):
                 feat = self.features(x)
                 return self.classifier(feat), self.mask_head(feat)
 

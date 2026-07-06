@@ -547,8 +547,8 @@ const TAB_ITEMS = [
 export default function AdminDashboard() {
   const navigate = useNavigate();
 
-  const handleLogout = () => {
-    signOut();
+  const handleLogout = async () => {
+    await signOut();
     navigate("/");
   };
 

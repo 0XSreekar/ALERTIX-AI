@@ -146,3 +146,37 @@ is `demo_seed`; the DEMO chips/banners exist precisely to keep this honest.
 ## External data sources
 
 USGS (earthquakes), IRIS (waveforms), IMD/RSMC + JTWC (cyclones), NASA FIRMS (wildfires), CWC India (river gauges), official flood bulletins, Open-Meteo (weather/rainfall), GSI (landslide zones), Sentinel-1 (SAR for flood extent). All free for non-commercial use.
+
+## Live infrastructure (as of 2026-05-25)
+
+| Service | Status | Notes |
+|---|---|---|
+| Supabase Postgres | LIVE | Project `wbwnznybrklpdshasyho`, PostgreSQL 17.6, PostGIS 3.3.7, all 21 tables created, Alembic at rev `007` |
+| Upstash Redis | LIVE | `curious-loon-135451.upstash.io`, TLS (`rediss://`), Redis 8.2.0 |
+| NASA FIRMS | LIVE | Key `d0c75f95...` confirmed against VIIRS_SNPP_NRT |
+| Gemini API | LIVE | `gemini-2.5-flash`, `gemini-2.5-pro` available |
+| Resend | KEY ISSUE | API key returns 403 on `/domains` — likely scope-restricted, may still send |
+| Groq | KEY ISSUE | API key returns 403 — regenerate at console.groq.com/keys |
+| Sentry | CONFIGURED | DSN set for both frontend (`@sentry/react`) and backend |
+
+### Known infrastructure gotcha — Supabase IPv6
+Supabase's **direct DB host** (`db.{ref}.supabase.co`) resolves to **IPv6 only**. Windows asyncpg connections fail with `getaddrinfo failed`. The sync `psycopg2` driver (used by Alembic) works fine, but the async runtime needs the **Supavisor pooler URL** instead:
+
+```
+postgresql+asyncpg://postgres.{ref}:{password}@aws-0-{region}.pooler.supabase.com:5432/postgres?ssl=require
+```
+
+The exact region is on the Supabase dashboard → Settings → Database → Connection pooling. Use **session mode** (port 5432) — transaction mode at 6543 breaks asyncpg prepared statement caching.
+
+Keep the **sync URL** pointed at the direct host for Alembic; only the async URL needs the pooler.
+
+### .env URL conventions
+- Async (asyncpg): `?ssl=require` (NOT `ssl=true`, NOT `sslmode=...`)
+- Sync (psycopg2): `?sslmode=require`
+- Passwords with `$` must be URL-encoded as `%24` in connection strings
+
+### Deployment plan (free tier only)
+- Frontend: Cloudflare Pages → `*.pages.dev` subdomain (free)
+- Backend: Render free tier → `*.onrender.com` subdomain (spins down after 15 min idle — acceptable for demo, upgrade to Starter $7/mo for production)
+- Cron: GitHub Actions hitting `/internal/*` with `X-Cron-Token`
+- No custom domain needed at this stage

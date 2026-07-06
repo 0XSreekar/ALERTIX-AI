@@ -16,6 +16,7 @@ class IngestMetric:
     duplicates: int = 0
     stored: int = 0
     streamed: int = 0
+    schema_drift: int = 0
     last_seen_epoch: float = field(default_factory=time.time)
 
 
@@ -34,6 +35,7 @@ class IngestionMetrics:
         duplicates: int = 0,
         stored: int = 0,
         streamed: int = 0,
+        schema_drift: int = 0,
     ) -> None:
         m = self._metrics[source]
         m.fetched += fetched
@@ -43,6 +45,7 @@ class IngestionMetrics:
         m.duplicates += duplicates
         m.stored += stored
         m.streamed += streamed
+        m.schema_drift += schema_drift
         m.last_seen_epoch = time.time()
 
     def snapshot(self) -> dict[str, dict[str, float | int]]:
@@ -55,6 +58,7 @@ class IngestionMetrics:
                 "duplicates": metric.duplicates,
                 "stored": metric.stored,
                 "streamed": metric.streamed,
+                "schema_drift": metric.schema_drift,
                 "last_seen_epoch": round(metric.last_seen_epoch, 3),
             }
             for name, metric in sorted(self._metrics.items())
@@ -73,6 +77,7 @@ class IngestionMetrics:
                     f"alertix_ingest_duplicates_total{{{labels}}} {metric.duplicates}",
                     f"alertix_ingest_stored_total{{{labels}}} {metric.stored}",
                     f"alertix_ingest_streamed_total{{{labels}}} {metric.streamed}",
+                    f"alertix_ingest_schema_drift_total{{{labels}}} {metric.schema_drift}",
                 ]
             )
         return "\n".join(lines) + "\n"

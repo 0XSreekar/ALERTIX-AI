@@ -23,14 +23,21 @@ def _verify_ws_token(token: str | None) -> dict | None:
     """Decode and verify a JWT for WebSocket connections.
 
     Returns the payload dict on success, or None if the token is missing/invalid.
+    Accepts both 'session' scope (legacy bearer tokens) and 'ws' scope (60s tickets
+    minted via /api/auth/ws-ticket). HTTP API endpoints reject 'ws'-scoped tokens
+    so a leaked ticket cannot be replayed against the REST API.
     """
     if not token:
         return None
     try:
         secret = get_jwt_secret()
-        return pyjwt.decode(token, secret, algorithms=["HS256"])
+        payload = pyjwt.decode(token, secret, algorithms=["HS256"])
     except pyjwt.PyJWTError:
         return None
+    scope = payload.get("scope", "session")
+    if scope not in ("session", "ws"):
+        return None
+    return payload
 
 
 class ConnectionManager:

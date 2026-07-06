@@ -1,5 +1,5 @@
 import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
-import { getUser, signOut, checkTokenExpiry } from "@/lib/localAuth";
+import { getUser, signOut } from "@/lib/localAuth";
 import RegionSelector from "@/components/RegionSelector";
 import Footer from "@/components/Footer";
 import { cn } from "@/lib/utils";
@@ -27,7 +27,6 @@ export default function Dashboard() {
   const location = useLocation();
 
   // Auth check (backup – ProtectedRoute handles the primary redirect)
-  checkTokenExpiry();
   const user = getUser();
   if (!user) {
     navigate("/login");
@@ -37,8 +36,8 @@ export default function Dashboard() {
   const userLevel = ROLE_LEVEL[user.role] ?? 0;
   const visibleTabs = tabs.filter((t) => userLevel >= (ROLE_LEVEL[t.minRole] ?? 0));
 
-  const handleLogout = () => {
-    signOut();
+  const handleLogout = async () => {
+    await signOut();
     navigate("/");
   };
 

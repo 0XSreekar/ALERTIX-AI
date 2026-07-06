@@ -1,6 +1,6 @@
+import { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
-import { getUser } from "@/lib/localAuth";
-import { checkTokenExpiry } from "@/lib/localAuth";
+import { getUser, verifySession, type LocalUser } from "@/lib/localAuth";
 
 type Role = "citizen" | "official" | "admin";
 
@@ -16,13 +16,27 @@ interface ProtectedRouteProps {
 }
 
 export default function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) {
-  // Check and clear expired token before reading user
-  checkTokenExpiry();
+  // Optimistic render from cached user metadata; verify against backend in the
+  // background so a stale cookie/JWT triggers a redirect on the next tick.
+  const [user, setUser] = useState<LocalUser | null>(() => getUser());
+  const [verified, setVerified] = useState(false);
 
-  const user = getUser();
+  useEffect(() => {
+    let cancelled = false;
+    void verifySession().then((fresh) => {
+      if (cancelled) return;
+      setUser(fresh);
+      setVerified(true);
+    });
+    return () => { cancelled = true; };
+  }, []);
 
-  if (!user) {
+  if (!user && verified) {
     return <Navigate to="/login" replace />;
+  }
+  if (!user) {
+    // Pre-verification: avoid flashing the login redirect if cookie is valid.
+    return null;
   }
 
   if (requiredRole) {

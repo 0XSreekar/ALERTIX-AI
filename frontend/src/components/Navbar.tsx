@@ -1,25 +1,21 @@
 import { Link, useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
-import { getUser, signOut, checkTokenExpiry, type LocalUser } from "@/lib/localAuth";
+import { getUser, signOut, verifySession, type LocalUser } from "@/lib/localAuth";
 import { Button } from "@/components/ui/button";
 
 export default function Navbar() {
-  const [user, setUser] = useState<LocalUser | null>(null);
+  const [user, setUser] = useState<LocalUser | null>(() => getUser());
   const navigate = useNavigate();
 
   useEffect(() => {
-    checkTokenExpiry();
-    setUser(getUser());
-    const onStorage = () => {
-      checkTokenExpiry();
-      setUser(getUser());
-    };
+    void verifySession().then(setUser);
+    const onStorage = () => setUser(getUser());
     window.addEventListener("storage", onStorage);
     return () => window.removeEventListener("storage", onStorage);
   }, []);
 
-  const handleLogout = () => {
-    signOut();
+  const handleLogout = async () => {
+    await signOut();
     setUser(null);
     navigate("/");
   };

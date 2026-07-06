@@ -1,4 +1,5 @@
 import type { Alert, HazardEvent } from "./types";
+import { getWsTicket } from "./localAuth";
 
 type MessageHandler<T> = (data: T) => void;
 type StatusHandler = (status: WsStatus) => void;
@@ -12,7 +13,7 @@ const MAX_RECONNECT_MS = 30_000;
 
 class AlertixWebSocket<T> {
   private ws: WebSocket | null = null;
-  private url: string;
+  private path: string;
   private handlers: Set<MessageHandler<T>> = new Set();
   private statusHandlers: Set<StatusHandler> = new Set();
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
@@ -22,7 +23,15 @@ class AlertixWebSocket<T> {
   private _status: WsStatus = "disconnected";
 
   constructor(path: string) {
-    this.url = `${WS_BASE}${path}`;
+    this.path = path;
+  }
+
+  /** Build the full WS URL with a fresh 60s auth ticket appended. */
+  private async buildAuthedUrl(): Promise<string | null> {
+    const ticket = await getWsTicket();
+    if (!ticket) return null;
+    const sep = this.path.includes("?") ? "&" : "?";
+    return `${WS_BASE}${this.path}${sep}token=${encodeURIComponent(ticket)}`;
   }
 
   get status(): WsStatus {
@@ -34,12 +43,19 @@ class AlertixWebSocket<T> {
     this.statusHandlers.forEach((h) => h(s));
   }
 
-  connect() {
+  async connect() {
     if (this.destroyed) return;
     if (this.ws?.readyState === WebSocket.OPEN) return;
 
     this.setStatus("connecting");
-    this.ws = new WebSocket(this.url);
+    const url = await this.buildAuthedUrl();
+    if (!url) {
+      // No session — surface as disconnected; ProtectedRoute will redirect to /login.
+      this.setStatus("disconnected");
+      return;
+    }
+    if (this.destroyed) return;
+    this.ws = new WebSocket(url);
 
     this.ws.onopen = () => {
       this.reconnectDelay = MIN_RECONNECT_MS; // reset backoff on success
@@ -71,7 +87,7 @@ class AlertixWebSocket<T> {
       const delay = this.reconnectDelay;
       this.reconnectDelay = Math.min(this.reconnectDelay * 2, MAX_RECONNECT_MS);
       this.reconnectTimer = setTimeout(() => {
-        if (!this.destroyed) this.connect();
+        if (!this.destroyed) void this.connect();
       }, delay);
     };
 
@@ -82,7 +98,7 @@ class AlertixWebSocket<T> {
 
   subscribe(handler: MessageHandler<T>) {
     this.handlers.add(handler);
-    if (this.handlers.size === 1) this.connect();
+    if (this.handlers.size === 1) void this.connect();
     return () => {
       this.handlers.delete(handler);
       if (this.handlers.size === 0) this.disconnect();
@@ -109,7 +125,7 @@ class AlertixWebSocket<T> {
     this.reconnectDelay = MIN_RECONNECT_MS;
     this.cleanupTimers();
     this.ws?.close();
-    this.connect();
+    void this.connect();
   }
 
   private cleanupTimers() {

@@ -62,7 +62,7 @@ const stats = [
 
 const stack = [
   "USGS", "IMD", "NASA FIRMS", "CWC",
-  "Sentinel-1", "Open-Meteo", "GSI", "Ollama", "FastAPI", "Supabase",
+  "Sentinel-1", "Open-Meteo", "GSI", "Ollama", "FastAPI", "PostGIS",
 ];
 
 const fadeUp = {

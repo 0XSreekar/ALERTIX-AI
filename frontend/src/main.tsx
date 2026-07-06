@@ -5,7 +5,7 @@ import { BrowserRouter } from "react-router-dom";
 import App from "./App";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { registerServiceWorker } from "./lib/offline";
-import { checkTokenExpiry } from "./lib/localAuth";
+import { verifySession } from "./lib/localAuth";
 import "./styles/globals.css";
 
 const queryClient = new QueryClient({
@@ -18,10 +18,12 @@ const queryClient = new QueryClient({
   },
 });
 
-// Check token expiry on startup
-checkTokenExpiry();
+// Verify session with backend on startup. The JWT cookie is HttpOnly so JS
+// can't inspect its expiry — we ask /api/auth/me and clear cached user
+// metadata if the cookie is missing or rejected.
+void verifySession();
 
-/** Simple toast shown when the 401 interceptor fires. */
+// eslint-disable-next-line react-refresh/only-export-components
 function SessionExpiredToast() {
   const [visible, setVisible] = useState(false);
 

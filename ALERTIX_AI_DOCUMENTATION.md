@@ -123,14 +123,15 @@ This table is the source of truth. Update it as components ship.
 └──────────────────────────────────────────────────────────┘
                             ↓
 ┌─────────────────── STORAGE LAYER ────────────────────────┐
-│  Supabase Postgres + PostGIS  (events, alerts, users)    │
-│  Cloudflare R2                (waveforms, imagery)       │
-│  Upstash Redis                (cache, hot alerts, queue) │
+│  Postgres + PostGIS  (events, alerts, users)             │
+│  Cloudflare R2       (waveforms, imagery)                │
+│  Upstash Redis       (cache, hot alerts, queue)          │
 └──────────────────────────────────────────────────────────┘
                             ↓
 ┌─────────────── API LAYER (FastAPI) ──────────────────────┐
 │  REST + WebSocket + Server-Sent Events                   │
-│  Supabase Auth (JWT)                                     │
+│  Local FastAPI auth — bcrypt + HS256 JWT in HttpOnly     │
+│  cookie; short-lived ticket for WebSocket upgrades       │
 └──────────────────────────────────────────────────────────┘
                             ↓
 ┌─────────── FRONTEND (React + Vite + TS) ─────────────────┐
@@ -1109,3 +1110,6 @@ This disclaimer is not optional. It is the minimum legal and ethical floor.
 ---
 
 *End of document.*
+
+
+this doc is the  of the main execution for my life i want to run it and make it one of my better things and better and 

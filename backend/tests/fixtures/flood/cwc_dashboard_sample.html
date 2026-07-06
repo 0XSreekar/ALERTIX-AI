@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<!--
+  Synthetic CWC flood-forecasting dashboard sample.
+
+  Mirrors the table shape the live CWC site has historically used. Used by
+  backend/tests/test_flood_parser.py to assert the parser still extracts
+  the expected fields and to detect structural drift via the fingerprint
+  helper. Update this fixture (and the fingerprint constant in
+  app/ingestion/flood/parser.py) whenever the upstream layout changes.
+-->
+<html lang="en">
+<head><title>CWC Flood Forecasting</title></head>
+<body>
+<h2>Daily Flood Bulletin — Sample</h2>
+<table>
+  <thead>
+    <tr>
+      <th>Flood Forecasting Site</th>
+      <th>River</th>
+      <th>Basin</th>
+      <th>State</th>
+      <th>District</th>
+      <th>Date</th>
+      <th>Time</th>
+      <th>Latitude</th>
+      <th>Longitude</th>
+      <th>Actual Level</th>
+      <th>Warning Level</th>
+      <th>Danger Level</th>
+      <th>Discharge</th>
+      <th>Trend</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Patna (Gandhi Ghat)</td>
+      <td>Ganga</td>
+      <td>Ganga</td>
+      <td>Bihar</td>
+      <td>Patna</td>
+      <td>15-09-2025</td>
+      <td>0800</td>
+      <td>25.6</td>
+      <td>85.1</td>
+      <td>50.20</td>
+      <td>48.60</td>
+      <td>50.45</td>
+      <td>32,500</td>
+      <td>Rising</td>
+    </tr>
+    <tr>
+      <td>Hathidah</td>
+      <td>Ganga</td>
+      <td>Ganga</td>
+      <td>Bihar</td>
+      <td>Patna</td>
+      <td>15-09-2025</td>
+      <td>0800</td>
+      <td>25.4</td>
+      <td>86.0</td>
+      <td>41.30</td>
+      <td>41.76</td>
+      <td>42.95</td>
+      <td>28,100</td>
+      <td>Steady</td>
+    </tr>
+    <tr>
+      <td>Dholaikuan</td>
+      <td>Yamuna</td>
+      <td>Yamuna</td>
+      <td>Delhi</td>
+      <td>South Delhi</td>
+      <td>15-09-2025</td>
+      <td>0800</td>
+      <td>28.5</td>
+      <td>77.2</td>
+      <td>205.10</td>
+      <td>204.50</td>
+      <td>205.33</td>
+      <td>9,400</td>
+      <td>Rising</td>
+    </tr>
+  </tbody>
+</table>
+</body>
+</html>

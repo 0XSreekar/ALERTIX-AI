@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import HazardMap from "@/components/Map";
+import HazardDisclaimer from "@/components/HazardDisclaimer";
 import { fetchRecentEvents } from "@/lib/api";
 import { Card, CardContent } from "@/components/ui/card";
 
@@ -13,6 +14,7 @@ export default function WildfireTab() {
   return (
     <div className="space-y-6">
       <h2 className="text-2xl font-bold">Wildfire Hotspots</h2>
+      <HazardDisclaimer hazard="wildfire" />
       <p className="text-sm text-muted-foreground">
         NASA FIRMS VIIRS/MODIS active fire detections in the last 24 hours.
         Phase 2 will add DBSCAN clustering and risk classification.

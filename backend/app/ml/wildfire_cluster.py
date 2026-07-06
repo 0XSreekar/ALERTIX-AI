@@ -35,6 +35,9 @@ def _normalize_hotspots(
 ) -> list[dict[str, Any]]:
     cleaned: list[dict[str, Any]] = []
     for item in hotspots:
+        lat: Any
+        lon: Any
+        frp: Any
         if isinstance(item, tuple):
             lat, lon, frp = item
             occurred_at = None

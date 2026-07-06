@@ -41,10 +41,10 @@ def score_event(event: ProcessingEvent) -> tuple[float, AlertTier]:
             "danger_level_m"
         )
         try:
-            score = min(1.0, max(0.0, float(severity) / 3.0))
+            score = min(1.0, max(0.0, float(severity) / 3.0))  # type: ignore[arg-type]
         except (TypeError, ValueError):
             try:
-                score = 0.25 + max(0.0, float(water_level) - float(danger_level)) / 2.0
+                score = 0.25 + max(0.0, float(water_level) - float(danger_level)) / 2.0  # type: ignore[arg-type]
             except (TypeError, ValueError):
                 score = 0.25
     elif hazard_type == "wildfire":

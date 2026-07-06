@@ -14,6 +14,7 @@ import {
   type DamageResult,
   type DamageReportSummary,
 } from "@/lib/types";
+import HazardDisclaimer from "@/components/HazardDisclaimer";
 
 const DAMAGE_ORDER: DamageClass[] = ["no_damage", "minor", "major", "destroyed"];
 
@@ -234,13 +235,12 @@ export default function DamageTab() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold">Damage Assessment</h2>
-        <p className="text-sm text-muted-foreground">
-          Upload drone or smartphone images. Our CNN classifies damage severity and segments
-          affected regions in the scene.
-        </p>
-      </div>
+      <h2 className="text-2xl font-bold">Damage Assessment</h2>
+      <HazardDisclaimer hazard="damage" />
+      <p className="text-sm text-muted-foreground">
+        Upload drone or smartphone images for AI-powered damage segmentation.
+        Phase 2 will use DeepLabV3 for building/road/water/vegetation detection.
+      </p>
 
       <div className="grid gap-6 lg:grid-cols-[1fr,360px]">
         <div className="space-y-6">

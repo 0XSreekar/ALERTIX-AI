@@ -5,11 +5,13 @@ from __future__ import annotations
 import json
 from typing import TypeAlias
 
+from app.config import get_settings
 from app.ingestion.common.logger import get_ingestion_logger
 from app.ingestion.common.schemas import NormalizedEvent, StoredEventRef
 from app.redis_client import get_redis
 
 log = get_ingestion_logger("stream")
+settings = get_settings()
 
 HAZARD_EVENTS_STREAM = "hazard:events"
 RedisField: TypeAlias = bytes | memoryview | str | int | float
@@ -48,7 +50,12 @@ async def publish_hazard_events(
                 "retry_count": str(event.retry_count),
                 "raw_payload": json.dumps(event.raw_payload, default=str),
             }
-            pipe.xadd(HAZARD_EVENTS_STREAM, payload)
+            pipe.xadd(
+                HAZARD_EVENTS_STREAM,
+                payload,
+                maxlen=settings.redis_stream_maxlen,
+                approximate=True,
+            )
             published += 1
 
         if published:

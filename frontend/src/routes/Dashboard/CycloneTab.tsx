@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import HazardMap from "@/components/Map";
+import HazardDisclaimer from "@/components/HazardDisclaimer";
 import { fetchRecentEvents } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
@@ -13,6 +14,7 @@ export default function CycloneTab() {
   return (
     <div className="space-y-6">
       <h2 className="text-2xl font-bold">Cyclone Tracker</h2>
+      <HazardDisclaimer hazard="cyclone" />
 
       <HazardMap
         events={data?.events || []}

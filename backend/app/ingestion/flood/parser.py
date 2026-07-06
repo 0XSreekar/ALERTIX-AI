@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import re
 from datetime import UTC, datetime
 from typing import Any
@@ -10,6 +11,65 @@ from bs4 import BeautifulSoup
 
 from app.ingestion.common.dedupe import timestamp_bucket_id
 from app.ingestion.common.schemas import NormalizedEvent
+
+# Header tokens we rely on across CWC tables. Used to detect structural drift
+# upstream — if NONE of these survive a scrape, the parser is likely broken
+# and we surface a warning + metric rather than silently ingesting nothing.
+_KNOWN_HEADER_TOKENS = frozenset(
+    {
+        "station",
+        "site",
+        "flood forecasting site",
+        "river",
+        "basin",
+        "state",
+        "district",
+        "actual level",
+        "water level",
+        "warning level",
+        "danger level",
+        "discharge",
+        "trend",
+    }
+)
+
+
+def fingerprint_html(html: str) -> str:
+    """Hash the sorted set of <th>/header tokens from an HTML page.
+
+    Stable across row-data changes (new gauge readings) but flips when CWC
+    renames columns or restructures tables. Compared against the last
+    known-good hash in client.py to detect upstream layout drift.
+    """
+    soup = BeautifulSoup(html, "lxml")
+    tokens: set[str] = set()
+    for table in soup.find_all("table"):
+        for cell in table.find_all("th"):
+            tokens.add(_clean(cell.get_text(" ")).lower())
+        if not table.find_all("th"):
+            first_row = table.find("tr")
+            if first_row:
+                for cell in first_row.find_all("td"):
+                    tokens.add(_clean(cell.get_text(" ")).lower())
+    joined = "|".join(sorted(t for t in tokens if t))
+    return hashlib.sha256(joined.encode("utf-8")).hexdigest()
+
+
+def detect_schema_drift(html: str) -> tuple[bool, set[str]]:
+    """Return (drift_suspected, recognised_header_tokens).
+
+    `drift_suspected` is True when fewer than 3 known header tokens are present
+    — at that point the parser will almost certainly return zero events and
+    the calling code should fall back to a secondary source.
+    """
+    soup = BeautifulSoup(html, "lxml")
+    found: set[str] = set()
+    for table in soup.find_all("table"):
+        for cell in table.find_all(["th", "td"]):
+            token = _clean(cell.get_text(" ")).lower()
+            if token in _KNOWN_HEADER_TOKENS:
+                found.add(token)
+    return len(found) < 3, found
 
 
 def _clean(text: str | None) -> str:

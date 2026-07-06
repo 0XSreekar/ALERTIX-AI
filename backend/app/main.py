@@ -1,7 +1,14 @@
+import asyncio
+import platform
 import uuid
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import Any, cast
+
+# psycopg3 async requires SelectorEventLoop on Windows. Must run before any
+# asyncio.get_event_loop() / asyncio.run() call, including uvicorn's bootstrap.
+if platform.system() == "Windows":
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 import sentry_sdk
 from fastapi import FastAPI, Request
@@ -26,8 +33,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     configure_logging()
     log.info("alertix_starting", version=__version__, env=settings.app_env)
 
-    # Validate JWT secret is properly configured before accepting traffic
-    settings.validate_jwt_secret()
+    # Validate all auth-gating secrets are properly configured before accepting traffic
+    settings.validate_startup_secrets()
 
     if settings.sentry_dsn_backend:
         sentry_sdk.init(
