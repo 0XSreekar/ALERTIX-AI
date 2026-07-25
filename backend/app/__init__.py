@@ -6,4 +6,4 @@ import asyncio as _asyncio
 import platform as _platform
 
 if _platform.system() == "Windows":
-    _asyncio.set_event_loop_policy(_asyncio.WindowsSelectorEventLoopPolicy())
+    _asyncio.set_event_loop_policy(_asyncio.WindowsSelectorEventLoopPolicy())  # type: ignore[attr-defined]
