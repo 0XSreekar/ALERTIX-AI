@@ -8,7 +8,7 @@ from typing import Any, cast
 # psycopg3 async requires SelectorEventLoop on Windows. Must run before any
 # asyncio.get_event_loop() / asyncio.run() call, including uvicorn's bootstrap.
 if platform.system() == "Windows":
-    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())  # type: ignore[attr-defined]
 
 import sentry_sdk
 from fastapi import FastAPI, Request
