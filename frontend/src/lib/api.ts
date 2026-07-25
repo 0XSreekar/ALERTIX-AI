@@ -222,7 +222,7 @@ export function damageImageUrl(reportId: string) {
 
 export function damageImageBlob(reportId: string) {
   return fetch(`${BASE}/api/damage/reports/${reportId}/image`, {
-    headers: authHeaders(),
+    credentials: "include",
   }).then((r) => {
     if (!r.ok) throw new Error(`Image ${r.status}`);
     return r.blob();
