@@ -398,12 +398,12 @@ async def predict_risk(
         pass
 
     features = RiskIndexFeatures(
-        eq_count_30d=float(eq_row.cnt or 0),
-        eq_max_magnitude=float(eq_row.mx or 0),
-        flood_max_intensity=float(flood_row.mx or 0),
+        eq_count_30d=float(eq_row.cnt or 0) if eq_row else 0.0,
+        eq_max_magnitude=float(eq_row.mx or 0) if eq_row else 0.0,
+        flood_max_intensity=float(flood_row.mx or 0) if flood_row else 0.0,
         rainfall_72h_mm=rainfall_72h,
-        wildfire_count_24h=float(fire_row.cnt or 0),
-        cyclone_wind_kmh=float(cyc_row.mx or 0),
+        wildfire_count_24h=float(fire_row.cnt or 0) if fire_row else 0.0,
+        cyclone_wind_kmh=float(cyc_row.mx or 0) if cyc_row else 0.0,
         landslide_rule_score=landslide_score,
     )
     raw = risk_index_score(features.model_dump())
