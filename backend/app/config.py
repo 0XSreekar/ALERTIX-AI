@@ -81,7 +81,6 @@ class Settings(BaseSettings):
     storage_backend: str = "local"
     local_upload_dir: str = "uploads"
     damage_model_checkpoint: str = ""
-    flood_lstm_checkpoint: str = ""
     flood_unet_checkpoint: str = ""
 
     # LLM (Phase 2)
