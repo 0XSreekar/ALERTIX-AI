@@ -1,5 +1,5 @@
 import asyncio
-import platform
+import sys
 import uuid
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -7,7 +7,7 @@ from typing import Any, cast
 
 # psycopg3 async requires SelectorEventLoop on Windows. Must run before any
 # asyncio.get_event_loop() / asyncio.run() call, including uvicorn's bootstrap.
-if platform.system() == "Windows":
+if sys.platform == "win32":
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 import sentry_sdk
