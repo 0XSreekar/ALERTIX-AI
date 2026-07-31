@@ -7,9 +7,17 @@ from datetime import datetime
 from typing import Any
 
 import numpy as np
-from sklearn.cluster import DBSCAN
 
 _EARTH_RADIUS_KM = 6371.0
+
+
+def _dbscan() -> Any:
+    """Import DBSCAN lazily so the slim API image does not require scikit-learn."""
+    try:
+        from sklearn.cluster import DBSCAN
+    except ImportError as exc:
+        raise RuntimeError("Install alertix-backend[ml] to cluster wildfire hotspots") from exc
+    return DBSCAN
 
 
 def _to_float_or_none(value: Any) -> float | None:
@@ -74,7 +82,7 @@ def cluster_hotspots(
         return []
 
     coords_rad = np.radians(np.array([[p["lat"], p["lon"]] for p in cleaned], dtype=float))
-    labels = DBSCAN(
+    labels = _dbscan()(
         eps=float(eps_km) / _EARTH_RADIUS_KM,
         min_samples=int(min_samples),
         metric="haversine",
