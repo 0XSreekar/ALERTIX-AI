@@ -35,11 +35,11 @@ function MarkdownLight({ md }: { md: string }) {
             </h3>
           );
         }
-        if (/^[\-*]\s/.test(line)) {
+        if (/^[-*]\s/.test(line)) {
           return (
             <div key={i} className="flex gap-2 pl-2">
               <span className="text-cyan-400">•</span>
-              <span dangerouslySetInnerHTML={{ __html: inline(line.replace(/^[\-*]\s/, "")) }} />
+              <span dangerouslySetInnerHTML={{ __html: inline(line.replace(/^[-*]\s/, "")) }} />
             </div>
           );
         }
