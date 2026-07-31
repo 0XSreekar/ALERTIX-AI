@@ -92,7 +92,6 @@ function MaskedImage({
 }) {
   return (
     <div className="relative w-full overflow-hidden rounded-lg border border-border bg-black">
-      {/* eslint-disable-next-line jsx-a11y/img-redundant-alt */}
       <img src={imageUrl} alt="Uploaded damage scene" className="block w-full" />
       {showMask && maskOverlay && (
         <img
