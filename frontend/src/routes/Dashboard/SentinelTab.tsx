@@ -65,8 +65,8 @@ export default function SentinelTab() {
     enabled: tab === "cascades",
   });
 
-  const events = streamData?.events ?? [];
-  const threats = threatsData?.threats ?? [];
+  const events = useMemo(() => streamData?.events ?? [], [streamData]);
+  const threats = useMemo(() => threatsData?.threats ?? [], [threatsData]);
 
   const allEventsOnGlobe = useMemo(() => {
     const seen = new Set(events.map((e) => e.id));
